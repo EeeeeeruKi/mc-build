@@ -27,14 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ inputs.java_version || '21' }}
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Gradle build
         id: build
@@ -81,6 +81,13 @@ jobs:
               if m:
                   errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
 
+          # 同じエラーが2回出力されることがあるので重複を除く
+          seen, uniq = set(), []
+          for e in errors:
+              k = (e[0], e[1], e[3].split("\n")[0])
+              if k not in seen:
+                  seen.add(k); uniq.append(e)
+          errors = uniq
           # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
           for path, line, col, msg in errors[:9]:
               rel = path[len(ws):] if path.startswith(ws) else path
@@ -98,7 +105,7 @@ jobs:
                   summary.append(l)
           if not summary:
               summary = lines[-40:]
-          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          text = "\n".join(summary).replace(ws, "").strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
           if len(errors) > 9:
               text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
           print(f"::error title=Gradle::{esc(text)}")
@@ -106,7 +113,7 @@ jobs:
 
       - name: Upload jars
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: mod-jars
           path: |

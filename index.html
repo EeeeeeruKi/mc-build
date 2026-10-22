@@ -337,14 +337,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ inputs.java_version || '21' }}
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Gradle build
         id: build
@@ -391,6 +391,13 @@ jobs:
               if m:
                   errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
 
+          # 同じエラーが2回出力されることがあるので重複を除く
+          seen, uniq = set(), []
+          for e in errors:
+              k = (e[0], e[1], e[3].split("\n")[0])
+              if k not in seen:
+                  seen.add(k); uniq.append(e)
+          errors = uniq
           # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
           for path, line, col, msg in errors[:9]:
               rel = path[len(ws):] if path.startswith(ws) else path
@@ -408,7 +415,7 @@ jobs:
                   summary.append(l)
           if not summary:
               summary = lines[-40:]
-          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          text = "\n".join(summary).replace(ws, "").strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
           if len(errors) > 9:
               text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
           print(f"::error title=Gradle::{esc(text)}")
@@ -416,7 +423,7 @@ jobs:
 
       - name: Upload jars
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: mod-jars
           path: |
@@ -482,7 +489,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Fetch upload
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.upload_ref }}
           path: upload
@@ -509,24 +516,27 @@ jobs:
             echo "gradle_cmd=./gradlew" >> "$GITHUB_OUTPUT"
             chmod +x gradlew
           else
-            v=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-\(bin\|all\)\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties 2>/dev/null | head -n1)
+            v=""
+            if [ -f gradle/wrapper/gradle-wrapper.properties ]; then
+              v=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-\(bin\|all\)\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties | head -n1 || true)
+            fi
             echo "gradle_version=${v:-current}" >> "$GITHUB_OUTPUT"
             echo "gradle_cmd=gradle" >> "$GITHUB_OUTPUT"
             echo "::warning title=Gradle::gradlew が無いので Gradle ${v:-（最新版）} を直接使います"
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ inputs.java_version || '21' }}
 
       - name: Setup Gradle (wrapper)
         if: steps.unpack.outputs.gradle_cmd == './gradlew'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Setup Gradle (direct)
         if: steps.unpack.outputs.gradle_cmd == 'gradle'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: ${{ steps.unpack.outputs.gradle_version }}
 
@@ -579,6 +589,13 @@ jobs:
               if m:
                   errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
 
+          # 同じエラーが2回出力されることがあるので重複を除く
+          seen, uniq = set(), []
+          for e in errors:
+              k = (e[0], e[1], e[3].split("\n")[0])
+              if k not in seen:
+                  seen.add(k); uniq.append(e)
+          errors = uniq
           # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
           for path, line, col, msg in errors[:9]:
               rel = path[len(ws):] if path.startswith(ws) else path
@@ -596,7 +613,7 @@ jobs:
                   summary.append(l)
           if not summary:
               summary = lines[-40:]
-          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          text = "\n".join(summary).replace(ws, "").strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
           if len(errors) > 9:
               text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
           print(f"::error title=Gradle::{esc(text)}")
@@ -996,9 +1013,10 @@ async function renderDetail(id) {
     : s.conclusion === "success" ? ["ok", "✓"] : s.conclusion === "failure" ? ["bad", "✕"] : ["mut", "–"];
   const steps = d.jobs.flatMap((j) => j.steps || []);
 
-  const notes = d.anns.filter((a) => (a.annotation_level === "failure" || a.annotation_level === "warning")
-    && !/^Process completed with exit code/.test(a.message || "")
-    && !/Node\.js \d+ actions are deprecated/i.test(a.message || ""));
+  // 自分のワークフローが出したもの（タイトル付き）とコンパイルエラーだけ見せる。GitHub自体のお知らせは隠す
+  const notes = d.anns.filter((a) =>
+    (a.annotation_level === "failure" && !/^Process completed with exit code/.test(a.message || "") && (a.title || (a.path && a.path !== ".github")))
+    || (a.annotation_level === "warning" && /^(Gradle|jar|zipの中身)$/.test(a.title || "")));
   notes.sort((a, b) => (a.annotation_level === "failure" ? 0 : 1) - (b.annotation_level === "failure" ? 0 : 1));
   const noteHtml = notes.length ? `<div class="errs">${notes.map((a) => {
       const loc = a.path && a.path !== ".github" ? `${a.path}:${a.start_line}` : (a.title || "エラー");
