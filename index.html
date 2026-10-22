@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
 <style>
-/* Layout: one narrow column like a crafting-table GUI — sticky header, build panel, latest jar, run history */
+/* Layout: one narrow column like a crafting-table GUI — sticky header with mode switch, build panel, latest jar, run history */
 :root {
   --bg: #e9ecea; --surface: #ffffff; --sunk: #f3f5f4; --line: #d3d9d5;
   --fg: #1c2320; --muted: #5b6761;
@@ -49,16 +49,19 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
-header.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+header.top .bar { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
 .mark { display: grid; grid-template-columns: repeat(3, 6px); gap: 2px; flex: none; }
 .mark i { width: 6px; height: 6px; background: var(--line); }
 .mark i.on { background: var(--accent); }
 .brand { min-width: 0; flex: 1; }
 .brand h1 { font: 20px/1.1 var(--font-display); margin: 0; letter-spacing: .02em; }
 .brand .repo { font: 12px/1.3 var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding-bottom: 10px; }
+.tabs button { min-height: 36px; font: 14px/1 var(--font-display); letter-spacing: .04em; background: var(--sunk); color: var(--muted); }
+.tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 
 main.wrap { display: flex; flex-direction: column; gap: 20px; padding-block: 16px; }
-section h2 { font: 13px/1.4 var(--font-display); letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; }
+section h2 { font: 13px/1.4 var(--font-display); letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 
 label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
@@ -74,6 +77,8 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .check input { width: 18px; height: 18px; }
 .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
 .hint code, .mono-s { font-family: var(--font-mono); font-size: 12px; }
+fieldset.group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+fieldset.group legend { font: 12px var(--font-display); letter-spacing: .06em; color: var(--muted); padding: 0; margin-bottom: 2px; }
 
 button, .btn {
   font: 700 15px/1 var(--font-body); border-radius: var(--r); border: 1px solid var(--line);
@@ -90,14 +95,35 @@ button:disabled { opacity: .55; cursor: default; }
 
 .msg { border-radius: var(--r); padding: 10px 12px; font-size: 14px; }
 .msg.err { background: var(--bad-bg); color: var(--bad); }
-.msg.info { background: var(--accent-soft); color: var(--fg); }
+.msg.info { background: var(--accent-soft); color: var(--fg); display: flex; align-items: center; gap: 10px; }
 
 .autojava { font-size: 12px; color: var(--accent); }
 
-.jar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--sunk); text-decoration: none; color: inherit; }
+/* zip picker */
+.drop { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 22px 14px; border: 2px dashed var(--line); border-radius: var(--r); background: var(--sunk); cursor: pointer; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; }
+.drop .big { font: 16px/1.3 var(--font-display); letter-spacing: .04em; }
+.slot { width: 36px; height: 36px; border: 2px solid var(--muted); box-shadow: inset 2px 2px 0 var(--line); display: grid; place-items: center; font: 11px var(--font-display); color: var(--muted); margin-bottom: 4px; }
+.zipcard { display: flex; flex-direction: column; gap: 8px; }
+.zipname { font: 600 14px/1.35 var(--font-mono); word-break: break-all; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12px/1 var(--font-mono); padding: 6px 8px; border-radius: 3px; background: var(--sunk); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.chip b { font-weight: 600; color: var(--accent); }
+.notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.notes li { padding-left: 16px; position: relative; }
+.notes li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; }
+.notes li.warn::before { background: var(--run); }
+.notes li.bad { color: var(--bad); }
+.notes li.bad::before { background: var(--bad); }
+.notes li.ok::before { background: var(--ok); }
+
+.jar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--sunk); text-decoration: none; color: inherit; width: 100%; text-align: left; font: inherit; min-height: 0; }
 .jar .ico { width: 30px; height: 30px; flex: none; border-radius: 4px; background: var(--accent-soft); display: grid; place-items: center; font: 11px var(--font-display); color: var(--accent); }
 .jar .nm { font: 600 13.5px/1.35 var(--font-mono); word-break: break-all; min-width: 0; flex: 1; }
 .jar .sz { font: 12px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.jars { display: flex; flex-direction: column; gap: 6px; }
 .meta { font-size: 12.5px; color: var(--muted); }
 
 .runs { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
@@ -116,7 +142,6 @@ details.run[open] > summary { background: var(--sunk); }
 .pill.mut { background: var(--sunk); color: var(--muted); border: 1px solid var(--line); }
 .pill.run::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; vertical-align: 1px; animation: blink 1s steps(2, start) infinite; }
 @keyframes blink { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { .pill.run::before { animation: none; } }
 
 .detail { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; background: var(--sunk); }
 .steps { list-style: none; margin: 0; padding: 0; font-size: 13.5px; display: flex; flex-direction: column; gap: 3px; }
@@ -126,12 +151,14 @@ details.run[open] > summary { background: var(--sunk); }
 .steps .d { font: 11.5px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .errs { display: flex; flex-direction: column; gap: 8px; }
 .err-item { border-left: 3px solid var(--bad); background: var(--surface); border-radius: 0 var(--r) var(--r) 0; padding: 8px 10px; min-width: 0; }
+.err-item.warn { border-left-color: var(--run); }
 .err-item .loc { font: 600 12px/1.4 var(--font-mono); color: var(--bad); word-break: break-all; }
+.err-item.warn .loc { color: var(--run); }
 .err-item pre { margin: 4px 0 0; font: 12px/1.5 var(--font-mono); white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
 .empty { padding: 18px 14px; color: var(--muted); font-size: 14px; text-align: center; }
-.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot .8s linear infinite; }
+.spin { display: inline-block; width: 14px; height: 14px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot .8s linear infinite; }
 @keyframes rot { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .spin, .pill.run::before { animation: none; } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: var(--r); font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
 textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertical; }
 </style>
@@ -139,12 +166,18 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
 <body>
 <header class="top">
   <div class="wrap">
-    <div class="mark" aria-hidden="true"><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
-    <div class="brand">
-      <h1>Mod作業台</h1>
-      <div class="repo" id="hdrRepo">未設定</div>
+    <div class="bar">
+      <div class="mark" aria-hidden="true"><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+      <div class="brand">
+        <h1>Mod作業台</h1>
+        <div class="repo" id="hdrRepo">未設定</div>
+      </div>
+      <button class="btn-ghost btn-small" id="btnSettings" type="button">設定</button>
     </div>
-    <button class="btn-ghost btn-small" id="btnSettings" type="button">設定</button>
+    <div class="tabs" id="tabs" role="group" aria-label="モード" hidden>
+      <button type="button" data-mode="repo" aria-pressed="true">リポジトリ</button>
+      <button type="button" data-mode="upload" aria-pressed="false">zipアップロード</button>
+    </div>
   </div>
 </header>
 
@@ -153,16 +186,26 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
   <section id="secSettings" hidden>
     <h2>設定</h2>
     <form class="panel" id="formSettings" autocomplete="off">
-      <label class="f">modのリポジトリ（owner/名前）
-        <input class="mono" id="inRepo" placeholder="your-name/my-mod" autocapitalize="off" spellcheck="false" required>
-      </label>
       <label class="f">GitHubトークン（Fine-grained）
         <input class="mono" id="inToken" type="password" placeholder="github_pat_…" autocapitalize="off" spellcheck="false" required>
       </label>
-      <p class="hint">権限は対象リポジトリだけに絞って、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
-      <label class="f">ワークフローのファイル名
-        <input class="mono" id="inWf" value="build.yml" autocapitalize="off" spellcheck="false">
-      </label>
+      <p class="hint">Repository access で下の2つのリポジトリを選び、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
+      <fieldset class="group">
+        <legend>リポジトリからビルド</legend>
+        <label class="f">modのリポジトリ（owner/名前）
+          <input class="mono" id="inRepo" placeholder="your-name/my-mod" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="f">ワークフローのファイル名
+          <input class="mono" id="inWf" value="build.yml" autocapitalize="off" spellcheck="false">
+        </label>
+      </fieldset>
+      <fieldset class="group">
+        <legend>zipアップロードでビルド</legend>
+        <label class="f">アップロード先（非公開リポジトリ）
+          <input class="mono" id="inUploadRepo" placeholder="your-name/mc-build-uploads" autocapitalize="off" spellcheck="false">
+        </label>
+      </fieldset>
+      <p class="hint">どちらか片方だけでも使えます。</p>
       <label class="check"><input type="checkbox" id="inRemember" checked> この端末にトークンを保存する</label>
       <div class="actions">
         <button class="btn-primary" type="submit">保存して接続</button>
@@ -192,7 +235,7 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
     </div>
   </section>
 
-  <!-- ビルド -->
+  <!-- リポジトリからビルド -->
   <section id="secBuild" hidden>
     <h2>ビルド</h2>
     <form class="panel" id="formBuild">
@@ -214,6 +257,39 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
       <label class="check"><input type="checkbox" id="inRelease" checked> 成功したらjarをダウンロード用に置く</label>
       <button class="btn-primary btn-big" type="submit" id="btnBuild">クラフト開始</button>
     </form>
+  </section>
+
+  <!-- zipアップロード -->
+  <section id="secUpload" hidden>
+    <h2>zipからビルド</h2>
+    <div class="panel">
+      <label class="drop" id="dropZone">
+        <input type="file" id="inZip" accept=".zip,application/zip,application/x-zip-compressed">
+        <span class="slot" aria-hidden="true">ZIP</span>
+        <span class="big" id="dropLabel">modのフォルダをzipにして選ぶ</span>
+        <span class="hint">build.gradle がある階層ごとzipに。build/ や .gradle/ は自動で外します</span>
+      </label>
+      <div class="zipcard" id="zipInfo" hidden></div>
+      <form id="formUpload" class="zipcard" hidden>
+        <label class="f">表示名
+          <input id="inLabel" placeholder="my-mod 1.0.0">
+        </label>
+        <div class="row">
+          <label class="f">Java
+            <select class="mono" id="inUpJava">
+              <option value="8">8</option><option value="11">11</option><option value="16">16</option>
+              <option value="17">17</option><option value="21" selected>21</option><option value="25">25</option>
+            </select>
+            <span class="autojava" id="upJavaHint"></span>
+          </label>
+          <label class="f">Gradleタスク
+            <input class="mono" id="inUpTask" value="build" autocapitalize="off" spellcheck="false">
+          </label>
+        </div>
+        <button class="btn-primary btn-big" type="submit" id="btnUpload">アップロードしてクラフト</button>
+      </form>
+      <div class="msg info" id="upProgress" role="status" hidden></div>
+    </div>
   </section>
 
   <!-- 最新jar -->
@@ -286,7 +362,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, re
-          ws = os.environ["GITHUB_WORKSPACE"].rstrip("/") + "/"
+          ws = (os.environ.get("SRC_ROOT") or os.environ["GITHUB_WORKSPACE"]).rstrip("/") + "/"
           try:
               lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
           except FileNotFoundError:
@@ -371,39 +447,232 @@ jobs:
             --title "Dev build (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" \
             --notes "run:${GITHUB_RUN_ID}"
 </script>
+<script type="text/plain" id="uploadWorkflowYaml">
+name: Build Upload
+run-name: "${{ inputs.label || inputs.upload_ref }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_ref:
+        description: "アップロードしたzipのブランチ（upload/…）"
+        required: true
+      label:
+        description: "表示名"
+        required: false
+        default: ""
+      java_version:
+        description: "Java version"
+        required: false
+        default: "21"
+      gradle_task:
+        description: "Gradle task"
+        required: false
+        default: "build"
+
+permissions:
+  contents: write
+
+env:
+  KEEP_UPLOADS: "10"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Fetch upload
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.upload_ref }}
+          path: upload
+
+      - name: Unpack source
+        id: unpack
+        shell: bash
+        run: |
+          mkdir src
+          unzip -q upload/source.zip -d src
+          cd src
+          # zipの中身がフォルダ1個だけなら、その中をプロジェクトのルートとして扱う
+          entries=$(ls -A)
+          if [ "$(echo "$entries" | wc -l)" = "1" ] && [ -d "$entries" ]; then
+            shopt -s dotglob; mv "$entries"/* . ; rmdir "$entries"
+          fi
+          found=""
+          for f in build.gradle build.gradle.kts settings.gradle settings.gradle.kts; do [ -f "$f" ] && found=1; done
+          if [ -z "$found" ]; then
+            echo "::error title=zipの中身::build.gradle が見つかりません。modのプロジェクトフォルダ（build.gradle がある階層）をzipにしてください。"
+            exit 1
+          fi
+          if [ -f gradlew ] && [ -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle_cmd=./gradlew" >> "$GITHUB_OUTPUT"
+            chmod +x gradlew
+          else
+            v=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-\(bin\|all\)\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties 2>/dev/null | head -n1)
+            echo "gradle_version=${v:-current}" >> "$GITHUB_OUTPUT"
+            echo "gradle_cmd=gradle" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Gradle::gradlew が無いので Gradle ${v:-（最新版）} を直接使います"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version || '21' }}
+
+      - name: Setup Gradle (wrapper)
+        if: steps.unpack.outputs.gradle_cmd == './gradlew'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Gradle (direct)
+        if: steps.unpack.outputs.gradle_cmd == 'gradle'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ steps.unpack.outputs.gradle_version }}
+
+      - name: Gradle build
+        id: build
+        shell: bash
+        working-directory: src
+        env:
+          TASK: ${{ inputs.gradle_task || 'build' }}
+          CMD: ${{ steps.unpack.outputs.gradle_cmd }}
+        run: |
+          set -o pipefail
+          $CMD $TASK --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure() && steps.build.outcome == 'failure'
+        shell: bash
+        working-directory: src
+        env:
+          SRC_ROOT: ${{ github.workspace }}/src
+        run: |
+          python3 - <<'PY'
+          import os, re
+          ws = (os.environ.get("SRC_ROOT") or os.environ["GITHUB_WORKSPACE"]).rstrip("/") + "/"
+          try:
+              lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
+          except FileNotFoundError:
+              lines = []
+          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+          lines = [ansi.sub("", l) for l in lines]
+
+          def esc(s):  # message escaping
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          def escp(s):  # property escaping
+              return esc(s).replace(":", "%3A").replace(",", "%2C")
+
+          java_re = re.compile(r"^(/\S+\.java):(\d+): error: (.*)$")
+          kt_re = re.compile(r"^e: (?:file://)?(/\S+\.kts?):(\d+):(\d+) (.*)$")
+          errors = []
+          for i, l in enumerate(lines):
+              m = java_re.match(l)
+              if m:
+                  path, line, msg = m.group(1), m.group(2), m.group(3)
+                  # javacは次の行にソース行を出すので添える
+                  if i + 1 < len(lines) and lines[i + 1].strip():
+                      msg += "\n" + lines[i + 1].rstrip()
+                  errors.append((path, line, None, msg))
+                  continue
+              m = kt_re.match(l)
+              if m:
+                  errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+
+          # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
+          for path, line, col, msg in errors[:9]:
+              rel = path[len(ws):] if path.startswith(ws) else path
+              props = f"file={escp(rel)},line={line}"
+              if col:
+                  props += f",col={col}"
+              print(f"::error {props},title=Compile error::{esc(msg)}")
+
+          summary = []
+          if "* What went wrong:" in lines:
+              start = lines.index("* What went wrong:") + 1
+              for l in lines[start:]:
+                  if l.startswith("* Try:") or l.startswith("* Exception is:"):
+                      break
+                  summary.append(l)
+          if not summary:
+              summary = lines[-40:]
+          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          if len(errors) > 9:
+              text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
+          print(f"::error title=Gradle::{esc(text)}")
+          PY
+      - name: Publish jars
+        if: success()
+        shell: bash
+        working-directory: src
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPLOAD_REF: ${{ inputs.upload_ref }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          shopt -s globstar nullglob
+          files=()
+          for f in **/build/libs/*.jar; do
+            case "$f" in *-sources.jar|*-javadoc.jar|*-dev*.jar) continue;; esac
+            files+=("$f")
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "::error title=jar::ビルドは通りましたが build/libs に jar がありません"; exit 1; }
+          tag="build-${UPLOAD_REF#upload/}"
+          gh release delete "$tag" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$tag" "${files[@]}" \
+            --target "$UPLOAD_REF" \
+            --title "${LABEL:-$tag}" \
+            --notes "run:${GITHUB_RUN_ID}" \
+            --latest=false
+
+      - name: Clean up old uploads
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # 新しい順に KEEP_UPLOADS 個だけ残して、古いアップロードとそのjarを消す
+          gh api "repos/$GH_REPO/git/matching-refs/heads/upload/" --jq '.[].ref' \
+            | sed 's#^refs/heads/##' | sort -r | tail -n +$((KEEP_UPLOADS + 1)) \
+            | while read -r ref; do
+                echo "delete $ref"
+                gh release delete "build-${ref#upload/}" --cleanup-tag -y 2>/dev/null || true
+                gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$ref" >/dev/null || true
+              done
+</script>
 <script>
 "use strict";
 const API = "https://api.github.com";
 const KEY = "modbench.v1";
-const RELEASE_TAG = "dev-build";
-const S = { repo: "", token: "", wf: "build.yml", remember: true, branch: "", java: "", task: "build", release: true };
+const UPLOAD_WF = "upload-build.yml";
+const JSZIP_URL = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+const S = { repo: "", uploadRepo: "", token: "", wf: "build.yml", remember: true, mode: "repo",
+            branch: "", java: "", task: "build", release: true, upTask: "build" };
 const $ = (id) => document.getElementById(id);
-const WF_YAML = $("workflowYaml").textContent.replace(/^\n/, "");
+const YAML = {
+  repo: $("workflowYaml").textContent.replace(/^\n/, ""),
+  upload: $("uploadWorkflowYaml").textContent.replace(/^\n/, ""),
+};
 
-let repoInfo = null;
+const infos = {};            // repo -> repo info
 let runsCache = [];
 const detailCache = new Map();
+let releaseByRun = new Map();
 let pollTimer = null;
-let latestRelease = null;
+let gen = 0;                 // bumps on mode/repo change so stale fetches don't render
+let prepared = null;         // cleaned zip waiting to upload
 
 /* ---------- storage ---------- */
-function loadState() {
-  try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
-}
+function loadState() { try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {} }
 function saveState() {
-  try {
-    const o = { ...S };
-    if (!S.remember) delete o.token;
-    localStorage.setItem(KEY, JSON.stringify(o));
-  } catch (e) {}
+  try { const o = { ...S }; if (!S.remember) delete o.token; localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {}
 }
 
 /* ---------- helpers ---------- */
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function toast(t) {
-  const el = $("toast"); el.textContent = t; el.hidden = false;
-  clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2600);
-}
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2800); }
 function showError(t) { const el = $("globalMsg"); el.textContent = t; el.hidden = !t; }
 function fmtSize(b) {
   if (b == null) return "";
@@ -433,14 +702,27 @@ async function copyText(t) {
   try { await navigator.clipboard.writeText(t); toast("コピーしました"); }
   catch (e) { const v = $("yamlView"); v.closest("details").open = true; v.focus(); v.select(); toast("選択したのでコピーしてください"); }
 }
+function stamp() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-` +
+    Math.random().toString(16).slice(2, 6);
+}
+
+/* ---------- mode ---------- */
+function modes() { return [S.repo && "repo", S.uploadRepo && "upload"].filter(Boolean); }
+function ctx() {
+  return S.mode === "upload" ? { repo: S.uploadRepo, wf: UPLOAD_WF, yaml: YAML.upload }
+                             : { repo: S.repo, wf: S.wf || "build.yml", yaml: YAML.repo };
+}
+const R = () => "/repos/" + ctx().repo;
+const info = () => infos[ctx().repo];
 
 /* ---------- GitHub API ---------- */
 async function gh(path, { method = "GET", body, accept } = {}) {
   let res;
   try {
     res = await fetch(path.startsWith("http") ? path : API + path, {
-      method,
-      cache: "no-store",
+      method, cache: "no-store",
       headers: {
         "Accept": accept || "application/vnd.github+json",
         "Authorization": "Bearer " + S.token,
@@ -459,6 +741,7 @@ async function gh(path, { method = "GET", body, accept } = {}) {
   }
   if (res.status === 204 || res.status === 202) return null;
   const ct = res.headers.get("content-type") || "";
+  if (accept === "application/octet-stream") return res.blob();
   return ct.includes("json") ? res.json() : res.text();
 }
 function explain(e, what) {
@@ -471,13 +754,13 @@ function explain(e, what) {
       return (what || "この操作") + "に必要な権限がトークンにありません（" + m + "）。";
     case 404: return (what || "対象") + "が見つかりません。リポジトリ名と、トークンがこのリポジトリにアクセスできるかを確認してください。";
     case 409: return "リポジトリが空か、競合が起きました（" + m + "）。";
+    case 413: return "ファイルが大きすぎます。zipから不要なものを外してください。";
     case 422: return (what || "この操作") + "がGitHubに拒否されました: " + m;
     default: return (what ? what + ": " : "") + (m || "不明なエラー");
   }
 }
-const R = () => "/repos/" + S.repo;
 
-/* ---------- Java auto-detect from gradle.properties ---------- */
+/* ---------- Java from Minecraft version ---------- */
 function javaForMc(v) {
   const m = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(v);
   if (!m) return null;
@@ -489,91 +772,152 @@ function javaForMc(v) {
   if (b <= 19 || (b === 20 && c <= 4)) return "17";
   return "21";
 }
+function mcVersionFrom(props) {
+  const m = /^\s*(?:minecraft_version|mc_version|minecraftVersion)\s*[=:]\s*([^\s#]+)/m.exec(props || "");
+  return m ? m[1] : null;
+}
 async function detectJava() {
   $("javaHint").textContent = "";
   try {
     const txt = await gh(R() + "/contents/gradle.properties?ref=" + encodeURIComponent(S.branch), { accept: "application/vnd.github.raw+json" });
-    const m = /^\s*(?:minecraft_version|mc_version|minecraftVersion)\s*[=:]\s*([^\s#]+)/m.exec(txt);
-    if (!m) return;
-    const j = javaForMc(m[1]);
+    const mc = mcVersionFrom(txt), j = mc && javaForMc(mc);
     if (!j) return;
     $("inJava").value = j; S.java = j;
-    $("javaHint").textContent = "MC " + m[1] + " → Java " + j + "（自動）";
+    $("javaHint").textContent = "MC " + mc + " → Java " + j + "（自動）";
   } catch (e) { /* gradle.properties が無いだけなら無視 */ }
 }
 
 /* ---------- boot ---------- */
+function setSectionsHidden() {
+  ["secBuild", "secUpload", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
+}
+function renderTabs() {
+  const ms = modes();
+  $("tabs").hidden = ms.length < 2;
+  $("tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === S.mode)));
+}
 async function connect() {
-  showError("");
-  $("hdrRepo").textContent = S.repo || "未設定";
-  if (!S.repo || !S.token) { openSettings(); return; }
+  gen++; clearTimeout(pollTimer);
+  showError(""); setSectionsHidden();
+  const ms = modes();
+  if (!S.token || !ms.length) { $("hdrRepo").textContent = "未設定"; $("tabs").hidden = true; openSettings(); return; }
+  if (!ms.includes(S.mode)) S.mode = ms[0];
+  renderTabs();
+  const c = ctx();
+  $("hdrRepo").textContent = c.repo;
+  const g = gen;
   try {
-    repoInfo = await gh(R());
-  } catch (e) { showError(explain(e, "リポジトリ")); openSettings(); return; }
+    infos[c.repo] = await gh(R());
+  } catch (e) { if (g === gen) { showError(explain(e, "リポジトリ")); openSettings(); } return; }
+  if (g !== gen) return;
 
-  $("secBuild").hidden = false; $("secJar").hidden = false; $("secRuns").hidden = false;
-
-  // branches
-  try {
-    const br = await gh(R() + "/branches?per_page=100");
-    const names = br.map((b) => b.name);
-    if (!names.includes(repoInfo.default_branch)) names.unshift(repoInfo.default_branch);
-    if (!S.branch || !names.includes(S.branch)) S.branch = repoInfo.default_branch;
-    $("inBranch").innerHTML = names.map((n) => `<option ${n === S.branch ? "selected" : ""}>${esc(n)}</option>`).join("");
-  } catch (e) {
-    S.branch = S.branch || repoInfo.default_branch;
-    $("inBranch").innerHTML = `<option>${esc(S.branch)}</option>`;
+  if (S.mode === "repo") {
+    $("secBuild").hidden = false;
+    try {
+      const br = await gh(R() + "/branches?per_page=100");
+      const names = br.map((b) => b.name);
+      if (!names.includes(info().default_branch)) names.unshift(info().default_branch);
+      if (!S.branch || !names.includes(S.branch)) S.branch = info().default_branch;
+      $("inBranch").innerHTML = names.map((n) => `<option ${n === S.branch ? "selected" : ""}>${esc(n)}</option>`).join("");
+    } catch (e) {
+      S.branch = S.branch || info().default_branch;
+      $("inBranch").innerHTML = `<option>${esc(S.branch)}</option>`;
+    }
+    $("inTask").value = S.task || "build";
+    $("inRelease").checked = S.release !== false;
+    if (S.java) $("inJava").value = S.java;
+    detectJava();
+  } else {
+    $("secUpload").hidden = false;
+    $("inUpTask").value = S.upTask || "build";
+    if (!info().private) showError("アップロード先が公開リポジトリです。アップロードしたソースは誰でも見られます。非公開にするか、別の非公開リポジトリを設定してください。");
   }
-  $("inTask").value = S.task || "build";
-  $("inRelease").checked = S.release !== false;
-  if (S.java) $("inJava").value = S.java;
-  detectJava();
+  $("secJar").hidden = false; $("secRuns").hidden = false;
 
-  // workflow present?
   try {
-    await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf));
+    await gh(R() + "/actions/workflows/" + encodeURIComponent(c.wf));
     $("secInstall").hidden = true;
   } catch (e) {
-    if (e.status === 404) { showInstall(); }
-    else showError(explain(e, "ワークフロー"));
+    if (g !== gen) return;
+    if (e.status === 404) showInstall(); else showError(explain(e, "ワークフロー"));
   }
   refreshAll();
 }
-
 function showInstall() {
-  $("wfPath").textContent = ".github/workflows/" + S.wf;
+  $("wfPath").textContent = ".github/workflows/" + ctx().wf;
+  $("yamlView").value = ctx().yaml;
   $("secInstall").hidden = false;
-  $("btnInstall").hidden = false; $("btnInstallSure").hidden = true;
+  $("btnInstall").hidden = false; $("btnInstallSure").hidden = true; $("btnInstallSure").disabled = false;
 }
+$("tabs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-mode]");
+  if (!b || b.dataset.mode === S.mode) return;
+  S.mode = b.dataset.mode; saveState(); connect();
+});
 
 /* ---------- refresh ---------- */
 async function refreshAll() {
   clearTimeout(pollTimer);
-  await Promise.all([refreshRuns(), refreshRelease()]);
+  const g = gen;
+  await refreshReleases();
+  await refreshRuns();
+  if (g !== gen) return;
+  renderLatestJar();
   const active = runsCache.some((r) => r.status !== "completed");
   if (!document.hidden) pollTimer = setTimeout(refreshAll, active ? 5000 : 30000);
 }
 
-async function refreshRelease() {
-  const box = $("jarBox");
+async function refreshReleases() {
+  const g = gen;
   try {
-    latestRelease = await gh(R() + "/releases/tags/" + RELEASE_TAG);
-  } catch (e) {
-    latestRelease = null;
-    box.innerHTML = e.status === 404
-      ? `<p class="hint">まだありません。ビルドが成功するとここにjarが並びます。</p>`
-      : `<p class="hint">${esc(explain(e, "リリース"))}</p>`;
+    const rels = await gh(R() + "/releases?per_page=30");
+    if (g !== gen) return;
+    releaseByRun = new Map();
+    for (const r of rels) {
+      const m = /run:(\d+)/.exec(r.body || "");
+      if (m) releaseByRun.set(m[1], r);
+    }
+  } catch (e) { if (g === gen) releaseByRun = new Map(); }
+}
+
+function jarList(rel) {
+  const priv = info() && info().private;
+  const assets = (rel.assets || []).filter((a) => /\.jar$/i.test(a.name));
+  if (!assets.length) return `<p class="hint">jarがありません。</p>`;
+  return `<div class="jars">${assets.map((a) => priv
+    ? `<button type="button" class="jar" data-dl="${esc(a.url)}" data-name="${esc(a.name)}" data-fallback="${esc(a.browser_download_url)}">
+         <span class="ico">JAR</span><span class="nm">${esc(a.name)}</span><span class="sz">${fmtSize(a.size)}</span></button>`
+    : `<a class="jar" href="${esc(a.browser_download_url)}" target="_blank" rel="noopener">
+         <span class="ico">JAR</span><span class="nm">${esc(a.name)}</span><span class="sz">${fmtSize(a.size)}</span></a>`).join("")}</div>`;
+}
+
+function renderLatestJar() {
+  const box = $("jarBox");
+  const run = runsCache.find((r) => r.conclusion === "success" && releaseByRun.has(String(r.id)));
+  if (!run) {
+    box.innerHTML = `<p class="hint">まだありません。ビルドが成功するとここにjarが並びます。</p>`;
     return;
   }
-  const assets = latestRelease.assets || [];
-  box.innerHTML =
-    `<div class="meta">${esc(latestRelease.name || "")} ・ ${esc(ago(latestRelease.created_at))}</div>` +
-    (assets.length
-      ? assets.map((a) => `<a class="jar" href="${esc(a.browser_download_url)}" target="_blank" rel="noopener">
-          <span class="ico">JAR</span><span class="nm">${esc(a.name)}</span><span class="sz">${fmtSize(a.size)}</span></a>`).join("")
-      : `<p class="hint">jarがありません。</p>`) +
-    (repoInfo && repoInfo.private ? `<p class="hint">非公開リポジトリなので、ダウンロードにはブラウザでGitHubにログインしている必要があります。</p>` : "");
+  const rel = releaseByRun.get(String(run.id));
+  box.innerHTML = `<div class="meta">${esc(rel.name || run.display_title)} ・ ${esc(ago(rel.created_at))}</div>` + jarList(rel);
 }
+
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-dl]");
+  if (!b) return;
+  b.disabled = true;
+  try {
+    const blob = await gh(b.dataset.dl, { accept: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = b.dataset.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    // ブラウザが直接取れない時は GitHub のページ経由（要ログイン）
+    window.open(b.dataset.fallback, "_blank", "noopener");
+    toast("GitHubで開きます（ログインが必要です）");
+  } finally { b.disabled = false; }
+});
 
 function statusOf(run) {
   if (run.status !== "completed") return { cls: "run", label: run.status === "in_progress" ? "クラフト中" : "待機中" };
@@ -588,31 +932,38 @@ function statusOf(run) {
 
 async function refreshRuns() {
   const list = $("runList");
+  const g = gen;
   let data;
   try {
-    data = await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf) + "/runs?per_page=15");
+    data = await gh(R() + "/actions/workflows/" + encodeURIComponent(ctx().wf) + "/runs?per_page=15");
   } catch (e) {
-    if (e.status === 404) { list.innerHTML = `<div class="empty">ワークフローを追加すると、ここに履歴が出ます。</div>`; runsCache = []; return; }
-    list.innerHTML = `<div class="empty">${esc(explain(e, "ビルド履歴"))}</div>`; return;
+    if (g !== gen) return;
+    runsCache = [];
+    list.innerHTML = e.status === 404
+      ? `<div class="empty">ワークフローを追加すると、ここに履歴が出ます。</div>`
+      : `<div class="empty">${esc(explain(e, "ビルド履歴"))}</div>`;
+    return;
   }
+  if (g !== gen) return;
   runsCache = data.workflow_runs || [];
   if (!runsCache.length) { list.innerHTML = `<div class="empty">まだビルドしていません。</div>`; return; }
 
   const open = new Set([...list.querySelectorAll("details.run[open]")].map((d) => d.dataset.id));
   list.innerHTML = runsCache.map((run) => {
     const st = statusOf(run);
-    const title = run.display_title || run.name;
+    const sub = S.mode === "upload"
+      ? `#${run.run_number} ・ zip ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}`
+      : `#${run.run_number} ・ ${esc(run.head_branch)} @ ${esc((run.head_sha || "").slice(0, 7))} ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}`;
     return `<details class="run" data-id="${run.id}" ${open.has(String(run.id)) ? "open" : ""}>
       <summary>
         <span class="pill ${st.cls}">${st.label}</span>
-        <span class="rtitle">${esc(title)}</span>
+        <span class="rtitle">${esc(run.display_title || run.name)}</span>
         <span class="rtime">${esc(ago(run.created_at))}</span>
-        <span class="rsub">#${run.run_number} ・ ${esc(run.head_branch)} @ ${esc((run.head_sha || "").slice(0, 7))} ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}</span>
+        <span class="rsub">${sub}</span>
       </summary>
       <div class="detail" id="d-${run.id}"><div class="empty"><span class="spin"></span></div></div>
     </details>`;
   }).join("");
-
   list.querySelectorAll("details.run").forEach((d) => {
     d.addEventListener("toggle", () => { if (d.open) renderDetail(d.dataset.id); });
     if (d.open) renderDetail(d.dataset.id);
@@ -624,54 +975,51 @@ async function renderDetail(id) {
   const run = runsCache.find((r) => String(r.id) === String(id));
   const box = $("d-" + id);
   if (!run || !box) return;
-  const key = id + ":" + run.updated_at + ":" + run.status;
+  const key = ctx().repo + ":" + id + ":" + run.updated_at + ":" + run.status;
   let d = detailCache.get(key);
   if (!d) {
     try {
-      const [jobs, arts] = await Promise.all([
-        gh(R() + "/actions/runs/" + id + "/jobs"),
-        gh(R() + "/actions/runs/" + id + "/artifacts"),
-      ]);
+      const jobs = await gh(R() + "/actions/runs/" + id + "/jobs");
       const anns = [];
       for (const j of jobs.jobs || []) {
-        if (j.conclusion === "failure" && j.check_run_url) {
+        if (j.status === "completed" && j.check_run_url) {
           try { anns.push(...(await gh(j.check_run_url + "/annotations?per_page=50"))); } catch (e) {}
         }
       }
-      d = { jobs: jobs.jobs || [], arts: arts.artifacts || [], anns };
+      d = { jobs: jobs.jobs || [], anns };
       detailCache.set(key, d);
     } catch (e) {
       box.innerHTML = `<div class="msg err">${esc(explain(e, "ビルドの詳細"))}</div>`; return;
     }
   }
-
   const stepIcon = (s) => s.status !== "completed" ? (s.status === "in_progress" ? ["run", "●"] : ["mut", "·"])
     : s.conclusion === "success" ? ["ok", "✓"] : s.conclusion === "failure" ? ["bad", "✕"] : ["mut", "–"];
   const steps = d.jobs.flatMap((j) => j.steps || []);
 
-  const errs = d.anns.filter((a) => a.annotation_level === "failure" && !/^Process completed with exit code/.test(a.message || ""));
-  const errHtml = errs.length ? `<div class="errs">${errs.map((a) => {
+  const notes = d.anns.filter((a) => (a.annotation_level === "failure" || a.annotation_level === "warning")
+    && !/^Process completed with exit code/.test(a.message || "")
+    && !/Node\.js \d+ actions are deprecated/i.test(a.message || ""));
+  notes.sort((a, b) => (a.annotation_level === "failure" ? 0 : 1) - (b.annotation_level === "failure" ? 0 : 1));
+  const noteHtml = notes.length ? `<div class="errs">${notes.map((a) => {
       const loc = a.path && a.path !== ".github" ? `${a.path}:${a.start_line}` : (a.title || "エラー");
-      return `<div class="err-item"><div class="loc">${esc(loc)}</div><pre>${esc(a.message)}</pre></div>`;
+      return `<div class="err-item ${a.annotation_level === "warning" ? "warn" : ""}"><div class="loc">${esc(loc)}</div><pre>${esc(a.message)}</pre></div>`;
     }).join("")}</div>` : "";
 
-  const isReleased = latestRelease && (latestRelease.body || "").trim() === "run:" + id;
-  let artHtml = "";
-  if (run.conclusion === "success") {
-    if (isReleased) artHtml = `<p class="hint" style="margin:0">このビルドのjarは上の「最新のjar」から落とせます。</p>`;
-    else if (d.arts.length) artHtml = `<p class="hint" style="margin:0">jar（${d.arts.map((a) => esc(a.name) + " " + fmtSize(a.size_in_bytes) + (a.expired ? "・期限切れ" : "")).join(", ")}）はGitHubの実行ページ下部からダウンロードできます。</p>`;
-  }
+  const rel = releaseByRun.get(String(id));
+  const jarHtml = run.conclusion === "success"
+    ? (rel ? jarList(rel) : `<p class="hint" style="margin:0">jarはGitHubの実行ページから確認できます。</p>`)
+    : "";
 
   const btns = [`<a class="btn btn-small" href="${esc(run.html_url)}" target="_blank" rel="noopener">GitHubで開く</a>`];
-  if (run.status !== "completed") btns.push(`<button class="btn-small btn-danger" data-act="cancel" data-id="${id}">中止</button>`);
-  if (run.status === "completed" && run.conclusion !== "success") btns.push(`<button class="btn-small" data-act="rerun" data-id="${id}">もう一回</button>`);
+  if (run.status !== "completed") btns.push(`<button type="button" class="btn-small btn-danger" data-act="cancel" data-id="${id}">中止</button>`);
+  if (run.status === "completed" && run.conclusion !== "success") btns.push(`<button type="button" class="btn-small" data-act="rerun" data-id="${id}">もう一回</button>`);
 
   box.innerHTML = `
-    ${errHtml}
+    ${noteHtml}
+    ${jarHtml}
     ${steps.length ? `<ul class="steps">${steps.map((s) => { const [c, i] = stepIcon(s);
         return `<li><span class="s ${c}">${i}</span><span>${esc(s.name)}</span><span class="d">${s.started_at ? dur(s.started_at, s.completed_at) : ""}</span></li>`; }).join("")}</ul>`
       : `<p class="hint" style="margin:0">ランナーの割り当て待ちです。</p>`}
-    ${artHtml}
     <div class="actions">${btns.join("")}</div>`;
 }
 
@@ -687,7 +1035,7 @@ $("runList").addEventListener("click", async (ev) => {
   } catch (e) { toast(explain(e, b.dataset.act === "cancel" ? "中止" : "再実行")); b.disabled = false; }
 });
 
-/* ---------- build ---------- */
+/* ---------- build from repo ---------- */
 $("formBuild").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const btn = $("btnBuild");
@@ -697,71 +1045,239 @@ $("formBuild").addEventListener("submit", async (ev) => {
   btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`;
   showError("");
   try {
-    await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf) + "/dispatches", {
+    await gh(R() + "/actions/workflows/" + encodeURIComponent(ctx().wf) + "/dispatches", {
       method: "POST",
       body: { ref: S.branch, inputs: { java_version: S.java, gradle_task: S.task, release: S.release ? "yes" : "no" } },
     });
     toast("ビルドを始めました");
-    setTimeout(refreshAll, 2500);
-    setTimeout(refreshAll, 7000);
+    setTimeout(refreshAll, 2500); setTimeout(refreshAll, 7000);
   } catch (e) {
-    if (e.status === 422 && /Unexpected inputs|inputs/i.test(e.message)) {
-      showError("リポジトリ側のワークフローが古いか別物です。「設定」→ワークフロー名を確認するか、最新のbuild.ymlに置き換えてください。（" + e.message + "）");
+    if (e.status === 422 && /input/i.test(e.message)) {
+      showError("リポジトリ側のワークフローが古いか別物です。最新の build.yml に置き換えてください。（" + e.message + "）");
     } else showError(explain(e, "ビルドの開始"));
-  } finally {
-    btn.disabled = false; btn.textContent = "クラフト開始";
-  }
+  } finally { btn.disabled = false; btn.textContent = "クラフト開始"; }
 });
 $("inBranch").addEventListener("change", () => { S.branch = $("inBranch").value; saveState(); detectJava(); });
+
+/* ---------- zip upload ---------- */
+function loadJSZip() {
+  if (window.JSZip) return Promise.resolve();
+  return loadJSZip._p || (loadJSZip._p = new Promise((ok, ng) => {
+    const s = document.createElement("script");
+    s.src = JSZIP_URL; s.onload = ok;
+    s.onerror = () => { loadJSZip._p = null; ng(new Error("zipを読む部品を読み込めませんでした。電波を確認してください。")); };
+    document.head.appendChild(s);
+  }));
+}
+
+const JUNK_DIRS = new Set(["build", ".gradle", "run", "runs", "out", "bin", "logs", ".idea", ".vscode", ".kotlin", ".fleet"]);
+const GRADLE_FILE = /(^|\/)(build|settings)\.gradle(\.kts)?$/;
+
+/* zipの中身を見て、プロジェクトのルートを決め、ビルドに要らないものを外す */
+function planZip(names) {
+  names = names.filter((n) => !/(^|\/)__MACOSX\//.test(n) && !/(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini)$/.test(n));
+  let prefix = "";
+  for (let guard = 0; guard < 6; guard++) {
+    const rel = names.map((n) => n.slice(prefix.length));
+    if (rel.some((r) => /^(build|settings)\.gradle(\.kts)?$/.test(r))) break;
+    const tops = new Set(rel.map((r) => r.split("/")[0]));
+    if (tops.size === 1 && rel.every((r) => r.includes("/"))) prefix += [...tops][0] + "/";
+    else break;
+  }
+  const inRoot = names.filter((n) => n.startsWith(prefix)).map((n) => [n, n.slice(prefix.length)]);
+  const gradleDirs = new Set(inRoot.filter(([, r]) => GRADLE_FILE.test(r)).map(([, r]) => r.includes("/") ? r.slice(0, r.lastIndexOf("/") + 1) : ""));
+  gradleDirs.add("");
+  const isJunk = (r) => {
+    if (/(^|\/)\.gradle\//.test(r) || /(^|\/)\.git\//.test(r)) return true;
+    const parts = r.split("/");
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!JUNK_DIRS.has(parts[i])) continue;
+      const parent = parts.slice(0, i).join("/");
+      if (gradleDirs.has(parent ? parent + "/" : "")) return true;
+    }
+    return false;
+  };
+  const keep = [], drop = [];
+  for (const pair of inRoot) (isJunk(pair[1]) ? drop : keep).push(pair);
+  return { prefix, keep, drop, outside: names.length - inRoot.length };
+}
+
+async function analyzeZip(file) {
+  await loadJSZip();
+  const zip = await JSZip.loadAsync(file);
+  const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+  const plan = planZip(names);
+  const has = (p) => plan.keep.some(([, r]) => r === p);
+  const read = async (p) => { const e = plan.keep.find(([, r]) => r === p); return e ? zip.files[e[0]].async("string") : null; };
+  const props = await read("gradle.properties");
+  const findRel = (re) => plan.keep.find(([, r]) => re.test(r));
+  const loader = findRel(/(^|\/)src\/main\/resources\/META-INF\/neoforge\.mods\.toml$/) ? "NeoForge"
+    : findRel(/(^|\/)src\/main\/resources\/fabric\.mod\.json$/) ? "Fabric"
+    : findRel(/(^|\/)src\/main\/resources\/quilt\.mod\.json$/) ? "Quilt"
+    : findRel(/(^|\/)src\/main\/resources\/META-INF\/mods\.toml$/) ? "Forge" : null;
+  const mc = mcVersionFrom(props);
+  const pv = (k) => { const m = new RegExp("^\\s*" + k + "\\s*=\\s*(.+)$", "m").exec(props || ""); return m ? m[1].trim() : null; };
+  const modName = pv("mod_name") || pv("archives_base_name") || pv("mod_id");
+  const modVer = pv("mod_version") || pv("version");
+
+  const notes = [];
+  const hasGradle = plan.keep.some(([, r]) => /^(build|settings)\.gradle(\.kts)?$/.test(r));
+  if (!hasGradle) notes.push(["bad", "build.gradle が見つかりません。modのプロジェクトフォルダ（build.gradle がある階層）をzipにしてください。"]);
+  if (hasGradle && !has("gradlew")) notes.push(["warn", "gradlew が無いので、Gradle を直接使ってビルドします。"]);
+  else if (hasGradle && !has("gradle/wrapper/gradle-wrapper.jar")) notes.push(["warn", "gradle-wrapper.jar が無いので、Gradle を直接使ってビルドします。"]);
+  if (plan.drop.length) notes.push(["ok", `ビルドに要らない ${plan.drop.length} 個のファイル（build/・.gradle/ など）を外しました。`]);
+  if (plan.prefix) notes.push(["ok", `「${plan.prefix.replace(/\/$/, "")}」フォルダの中をプロジェクトとして使います。`]);
+  if (plan.outside) notes.push(["warn", `プロジェクトの外にある ${plan.outside} 個のファイルは無視します。`]);
+
+  return { file, zip, plan, mc, java: mc && javaForMc(mc), loader, modName, modVer, notes, ok: hasGradle };
+}
+
+async function onZipChosen(file) {
+  prepared = null;
+  $("formUpload").hidden = true; $("upProgress").hidden = true;
+  const box = $("zipInfo");
+  if (!file) { box.hidden = true; return; }
+  if (!/\.zip$/i.test(file.name)) { box.hidden = false; box.innerHTML = `<div class="msg err">zipファイルを選んでください。</div>`; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="msg info"><span class="spin"></span>中身を確認しています…</div>`;
+  let a;
+  try { a = await analyzeZip(file); }
+  catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message && /JSZip|zip/i.test(e.message) ? e.message : "zipを開けませんでした。壊れていないか確認してください。")}</div>`; return; }
+
+  const chips = [
+    a.loader && `<span class="chip"><b>${esc(a.loader)}</b></span>`,
+    a.mc && `<span class="chip">MC <b>${esc(a.mc)}</b></span>`,
+    `<span class="chip">${a.plan.keep.length} ファイル</span>`,
+    `<span class="chip">${fmtSize(file.size)}</span>`,
+  ].filter(Boolean).join("");
+  box.innerHTML = `
+    <div class="zipname">${esc(file.name)}</div>
+    <div class="chips">${chips}</div>
+    ${a.notes.length ? `<ul class="notes">${a.notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join("")}</ul>` : ""}`;
+  $("dropLabel").textContent = "別のzipを選ぶ";
+  if (!a.ok) return;
+
+  prepared = a;
+  $("inLabel").value = [a.modName, a.modVer].filter(Boolean).join(" ") || file.name.replace(/\.zip$/i, "");
+  $("upJavaHint").textContent = "";
+  if (a.java) { $("inUpJava").value = a.java; $("upJavaHint").textContent = "MC " + a.mc + " → Java " + a.java + "（自動）"; }
+  $("formUpload").hidden = false;
+}
+
+$("inZip").addEventListener("change", (ev) => onZipChosen(ev.target.files[0]));
+["dragenter", "dragover"].forEach((t) => $("dropZone").addEventListener(t, (e) => { e.preventDefault(); $("dropZone").classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => $("dropZone").addEventListener(t, () => $("dropZone").classList.remove("over")));
+$("dropZone").addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onZipChosen(f); });
+
+function progress(t, spin = true) {
+  const p = $("upProgress");
+  p.hidden = false;
+  p.innerHTML = (spin ? `<span class="spin"></span>` : "") + `<span>${esc(t)}</span>`;
+}
+
+$("formUpload").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if (!prepared) return;
+  const a = prepared;
+  const btn = $("btnUpload");
+  const label = $("inLabel").value.trim() || a.file.name;
+  const java = $("inUpJava").value;
+  const task = $("inUpTask").value.trim() || "build";
+  S.upTask = task; saveState();
+  btn.disabled = true; showError("");
+  const id = stamp();
+  const ref = "upload/" + id;
+  try {
+    progress("zipを整理しています…");
+    const out = new JSZip();
+    for (const [src, rel] of a.plan.keep) out.file(rel, a.zip.files[src].async("uint8array"));
+    const b64 = await out.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const bytes = Math.floor(b64.length * 3 / 4);
+    if (bytes > 90 * 1048576) throw Object.assign(new Error(), { status: 413 });
+
+    progress(`アップロードしています…（${fmtSize(bytes)}）`);
+    const blob = await gh(R() + "/git/blobs", { method: "POST", body: { content: b64, encoding: "base64" } });
+    const tree = await gh(R() + "/git/trees", { method: "POST", body: { tree: [{ path: "source.zip", mode: "100644", type: "blob", sha: blob.sha }] } });
+    const commit = await gh(R() + "/git/commits", { method: "POST", body: { message: "Upload: " + label, tree: tree.sha, parents: [] } });
+    await gh(R() + "/git/refs", { method: "POST", body: { ref: "refs/heads/" + ref, sha: commit.sha } });
+
+    progress("ビルドを始めています…");
+    await gh(R() + "/actions/workflows/" + UPLOAD_WF + "/dispatches", {
+      method: "POST",
+      body: { ref: info().default_branch, inputs: { upload_ref: ref, label, java_version: java, gradle_task: task } },
+    });
+    progress("ビルドを始めました。下の履歴で進み具合を見られます。", false);
+    toast("ビルドを始めました");
+    setTimeout(refreshAll, 2500); setTimeout(refreshAll, 7000);
+  } catch (e) {
+    $("upProgress").hidden = true;
+    if (e.status === 409) showError("アップロード先のリポジトリが空です。先に「ワークフローを追加」してください。");
+    else showError(explain(e, "アップロード"));
+  } finally { btn.disabled = false; }
+});
 
 /* ---------- install workflow ---------- */
 $("btnInstall").addEventListener("click", () => { $("btnInstall").hidden = true; $("btnInstallSure").hidden = false; });
 $("btnInstallSure").addEventListener("click", async () => {
   const b = $("btnInstallSure"); b.disabled = true;
-  const path = ".github/workflows/" + S.wf;
+  const c = ctx();
+  const path = ".github/workflows/" + c.wf;
+  const branch = info().default_branch;
   try {
     let sha;
-    try { sha = (await gh(R() + "/contents/" + path + "?ref=" + encodeURIComponent(repoInfo.default_branch))).sha; } catch (e) { if (e.status !== 404) throw e; }
+    try { sha = (await gh(R() + "/contents/" + path + "?ref=" + encodeURIComponent(branch))).sha; }
+    catch (e) { if (e.status !== 404 && e.status !== 409) throw e; }
     await gh(R() + "/contents/" + path, {
       method: "PUT",
-      body: { message: "Add mod build workflow", content: utf8b64(WF_YAML), branch: repoInfo.default_branch, ...(sha ? { sha } : {}) },
+      body: { message: "Add " + c.wf, content: utf8b64(c.yaml), ...(sha ? { sha, branch } : {}) },
     });
     toast("ワークフローを追加しました");
     $("secInstall").hidden = true;
+    infos[c.repo] = await gh(R()).catch(() => infos[c.repo]);
     setTimeout(refreshAll, 1500);
   } catch (e) {
     showError(explain(e, "ワークフローの追加") + " うまくいかない時は「YAMLをコピー」して、GitHubで " + path + " を作って貼り付けてください。");
     b.disabled = false;
   }
 });
-$("btnCopyYaml").addEventListener("click", () => copyText(WF_YAML));
-$("yamlView").value = WF_YAML;
+$("btnCopyYaml").addEventListener("click", () => copyText(ctx().yaml));
 
 /* ---------- settings ---------- */
 function openSettings() {
-  $("inRepo").value = S.repo; $("inToken").value = S.token; $("inWf").value = S.wf || "build.yml";
+  $("inRepo").value = S.repo; $("inUploadRepo").value = S.uploadRepo;
+  $("inToken").value = S.token; $("inWf").value = S.wf || "build.yml";
   $("inRemember").checked = S.remember !== false;
   $("secSettings").hidden = false;
-  $("btnCancelSettings").hidden = !(S.repo && S.token);
+  $("btnCancelSettings").hidden = !(S.token && modes().length);
 }
 $("btnSettings").addEventListener("click", () => { $("secSettings").hidden ? openSettings() : ($("secSettings").hidden = true); });
 $("btnCancelSettings").addEventListener("click", () => { $("secSettings").hidden = true; });
 $("btnForget").addEventListener("click", () => {
   try { localStorage.removeItem(KEY); } catch (e) {}
-  Object.assign(S, { repo: "", token: "", wf: "build.yml", branch: "", java: "", task: "build", release: true });
-  $("inRepo").value = ""; $("inToken").value = "";
-  ["secBuild", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
-  $("hdrRepo").textContent = "未設定";
+  Object.assign(S, { repo: "", uploadRepo: "", token: "", wf: "build.yml", mode: "repo", branch: "", java: "", task: "build", release: true, upTask: "build" });
+  ["inRepo", "inUploadRepo", "inToken"].forEach((i) => ($(i).value = ""));
+  gen++; clearTimeout(pollTimer); setSectionsHidden();
+  $("tabs").hidden = true; $("hdrRepo").textContent = "未設定";
   toast("保存を消しました");
 });
+function normRepo(v) {
+  return v.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/+$/, "");
+}
 $("formSettings").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  let repo = $("inRepo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/+$/, "");
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
-  const changed = repo !== S.repo;
-  S.repo = repo; S.token = $("inToken").value.trim(); S.wf = $("inWf").value.trim() || "build.yml";
+  const repo = normRepo($("inRepo").value), up = normRepo($("inUploadRepo").value);
+  const ok = (r) => !r || /^[\w.-]+\/[\w.-]+$/.test(r);
+  if (!repo && !up) { showError("modのリポジトリか、アップロード先のどちらかを入れてください。"); return; }
+  if (!ok(repo) || !ok(up)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
+  if (repo !== S.repo) { S.branch = ""; S.java = ""; }
+  const prevModes = modes();
+  S.repo = repo; S.uploadRepo = up;
+  S.token = $("inToken").value.trim(); S.wf = $("inWf").value.trim() || "build.yml";
   S.remember = $("inRemember").checked;
-  if (changed) { S.branch = ""; S.java = ""; detailCache.clear(); }
+  // 新しく足したほうのモードを開く
+  if (up && !prevModes.includes("upload")) S.mode = "upload";
+  else if (repo && !prevModes.includes("repo")) S.mode = "repo";
+  detailCache.clear();
   saveState();
   $("secSettings").hidden = true;
   connect();
@@ -769,7 +1285,7 @@ $("formSettings").addEventListener("submit", (ev) => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) clearTimeout(pollTimer);
-  else if (S.repo && S.token && repoInfo) refreshAll();
+  else if (S.token && info()) refreshAll();
 });
 
 loadState();

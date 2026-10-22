@@ -1,0 +1,193 @@
+name: Build Upload
+run-name: "${{ inputs.label || inputs.upload_ref }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_ref:
+        description: "アップロードしたzipのブランチ（upload/…）"
+        required: true
+      label:
+        description: "表示名"
+        required: false
+        default: ""
+      java_version:
+        description: "Java version"
+        required: false
+        default: "21"
+      gradle_task:
+        description: "Gradle task"
+        required: false
+        default: "build"
+
+permissions:
+  contents: write
+
+env:
+  KEEP_UPLOADS: "10"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Fetch upload
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.upload_ref }}
+          path: upload
+
+      - name: Unpack source
+        id: unpack
+        shell: bash
+        run: |
+          mkdir src
+          unzip -q upload/source.zip -d src
+          cd src
+          # zipの中身がフォルダ1個だけなら、その中をプロジェクトのルートとして扱う
+          entries=$(ls -A)
+          if [ "$(echo "$entries" | wc -l)" = "1" ] && [ -d "$entries" ]; then
+            shopt -s dotglob; mv "$entries"/* . ; rmdir "$entries"
+          fi
+          found=""
+          for f in build.gradle build.gradle.kts settings.gradle settings.gradle.kts; do [ -f "$f" ] && found=1; done
+          if [ -z "$found" ]; then
+            echo "::error title=zipの中身::build.gradle が見つかりません。modのプロジェクトフォルダ（build.gradle がある階層）をzipにしてください。"
+            exit 1
+          fi
+          if [ -f gradlew ] && [ -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle_cmd=./gradlew" >> "$GITHUB_OUTPUT"
+            chmod +x gradlew
+          else
+            v=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-\(bin\|all\)\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties 2>/dev/null | head -n1)
+            echo "gradle_version=${v:-current}" >> "$GITHUB_OUTPUT"
+            echo "gradle_cmd=gradle" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Gradle::gradlew が無いので Gradle ${v:-（最新版）} を直接使います"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version || '21' }}
+
+      - name: Setup Gradle (wrapper)
+        if: steps.unpack.outputs.gradle_cmd == './gradlew'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Gradle (direct)
+        if: steps.unpack.outputs.gradle_cmd == 'gradle'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ steps.unpack.outputs.gradle_version }}
+
+      - name: Gradle build
+        id: build
+        shell: bash
+        working-directory: src
+        env:
+          TASK: ${{ inputs.gradle_task || 'build' }}
+          CMD: ${{ steps.unpack.outputs.gradle_cmd }}
+        run: |
+          set -o pipefail
+          $CMD $TASK --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure() && steps.build.outcome == 'failure'
+        shell: bash
+        working-directory: src
+        env:
+          SRC_ROOT: ${{ github.workspace }}/src
+        run: |
+          python3 - <<'PY'
+          import os, re
+          ws = (os.environ.get("SRC_ROOT") or os.environ["GITHUB_WORKSPACE"]).rstrip("/") + "/"
+          try:
+              lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
+          except FileNotFoundError:
+              lines = []
+          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+          lines = [ansi.sub("", l) for l in lines]
+
+          def esc(s):  # message escaping
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          def escp(s):  # property escaping
+              return esc(s).replace(":", "%3A").replace(",", "%2C")
+
+          java_re = re.compile(r"^(/\S+\.java):(\d+): error: (.*)$")
+          kt_re = re.compile(r"^e: (?:file://)?(/\S+\.kts?):(\d+):(\d+) (.*)$")
+          errors = []
+          for i, l in enumerate(lines):
+              m = java_re.match(l)
+              if m:
+                  path, line, msg = m.group(1), m.group(2), m.group(3)
+                  # javacは次の行にソース行を出すので添える
+                  if i + 1 < len(lines) and lines[i + 1].strip():
+                      msg += "\n" + lines[i + 1].rstrip()
+                  errors.append((path, line, None, msg))
+                  continue
+              m = kt_re.match(l)
+              if m:
+                  errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+
+          # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
+          for path, line, col, msg in errors[:9]:
+              rel = path[len(ws):] if path.startswith(ws) else path
+              props = f"file={escp(rel)},line={line}"
+              if col:
+                  props += f",col={col}"
+              print(f"::error {props},title=Compile error::{esc(msg)}")
+
+          summary = []
+          if "* What went wrong:" in lines:
+              start = lines.index("* What went wrong:") + 1
+              for l in lines[start:]:
+                  if l.startswith("* Try:") or l.startswith("* Exception is:"):
+                      break
+                  summary.append(l)
+          if not summary:
+              summary = lines[-40:]
+          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          if len(errors) > 9:
+              text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
+          print(f"::error title=Gradle::{esc(text)}")
+          PY
+      - name: Publish jars
+        if: success()
+        shell: bash
+        working-directory: src
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPLOAD_REF: ${{ inputs.upload_ref }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          shopt -s globstar nullglob
+          files=()
+          for f in **/build/libs/*.jar; do
+            case "$f" in *-sources.jar|*-javadoc.jar|*-dev*.jar) continue;; esac
+            files+=("$f")
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "::error title=jar::ビルドは通りましたが build/libs に jar がありません"; exit 1; }
+          tag="build-${UPLOAD_REF#upload/}"
+          gh release delete "$tag" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$tag" "${files[@]}" \
+            --target "$UPLOAD_REF" \
+            --title "${LABEL:-$tag}" \
+            --notes "run:${GITHUB_RUN_ID}" \
+            --latest=false
+
+      - name: Clean up old uploads
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # 新しい順に KEEP_UPLOADS 個だけ残して、古いアップロードとそのjarを消す
+          gh api "repos/$GH_REPO/git/matching-refs/heads/upload/" --jq '.[].ref' \
+            | sed 's#^refs/heads/##' | sort -r | tail -n +$((KEEP_UPLOADS + 1)) \
+            | while read -r ref; do
+                echo "delete $ref"
+                gh release delete "build-${ref#upload/}" --cleanup-tag -y 2>/dev/null || true
+                gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$ref" >/dev/null || true
+              done

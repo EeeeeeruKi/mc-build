@@ -52,7 +52,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, re
-          ws = os.environ["GITHUB_WORKSPACE"].rstrip("/") + "/"
+          ws = (os.environ.get("SRC_ROOT") or os.environ["GITHUB_WORKSPACE"]).rstrip("/") + "/"
           try:
               lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
           except FileNotFoundError:

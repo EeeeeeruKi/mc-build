@@ -43,6 +43,21 @@ GitHub → Settings → Developer settings → Personal access tokens → Fine-g
 - iPhone: Safariで開いて 共有 → ホーム画面に追加
 - Android: Chromeのメニュー → ホーム画面に追加
 
+## zipアップロードでビルド
+
+modのソースをGitHubに上げてなくても、フォルダをzipにして選ぶだけでビルドできる。
+
+1. 空の**非公開**リポジトリを作る（例: `mc-build-uploads`）。ソースはここに置かれるので必ず private にする
+2. トークンの Repository access にそのリポジトリも入れる
+3. アプリの設定「アップロード先」に `owner/mc-build-uploads` を入れる
+4. 「ワークフローを追加」（`upload-build.yml` が入る）
+5. 「zipアップロード」タブでzipを選んで「アップロードしてクラフト」
+
+- zipの中の `build/` `.gradle/` `run/` `.idea/` などはアプリが自動で外してから送る
+- zipがフォルダ1個を包んでいても、`build.gradle` がある階層を自動で探す
+- `gradlew` が無くても、`gradle-wrapper.properties` のバージョンか最新のGradleでビルドする
+- アップロードは新しいもの10個まで残して、古いものはビルド時に自動で消える
+
 ## 仕組みメモ
 
 - `build.yml` は `workflow_dispatch` で起動、`./gradlew <タスク>` を実行
