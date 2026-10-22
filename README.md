@@ -1,70 +1,32 @@
 # Mod作業台
 
-スマホからJava版modのビルドを回すWebアプリ。ビルド本体はGitHub Actionsが動かすので、PCは起動してなくてOK。
+スマホからJava版modをビルドするWebアプリ。modのフォルダをzipにしてアップロードすると、GitHub Actionsがビルドしてjarを返してくれる。PCは起動してなくてOK。
 
-## できること
+アプリ: https://eeeeeeruki.github.io/mc-build/
 
-- ブランチ・Javaバージョン・Gradleタスクを選んでビルド開始
-- `gradle.properties` の `minecraft_version` からJavaバージョンを自動で選ぶ（1.20.1→17、1.20.5以降→21 など）
-- ビルド中・成功・失敗をリアルタイムで表示（5秒ごとに更新）
-- 失敗したら、どのファイルの何行目でコンパイルエラーが出たかをそのまま表示
-- 成功したjarを「最新のjar」からワンタップでダウンロード
-- 実行中の中止、失敗したビルドのやり直し
+## 使い方
 
-## セットアップ
+1. トークンを作る（https://github.com/settings/personal-access-tokens/new）
+   - Repository access: **Only select repositories** → `mc-build-uploads`
+   - Permissions: **Actions / Contents / Workflows** を「Read and write」
+2. アプリの「設定」にトークンを貼って「保存して接続」
+   - アップロード先は空のままなら `EeeeeeruKi/mc-build-uploads` を使う
+3. modのフォルダ（build.gradle がある階層）をzipにして選ぶ
+4. 「アップロードしてクラフト」→ 数分で「最新のjar」からダウンロード
 
-### 1. アプリをGitHub Pagesに置く
+## アプリが自動でやること
 
-1. GitHubで新しいリポジトリを作る（例: `mod-bench`）。公開でOK（トークンはアプリに入っていない）
-2. このフォルダの `index.html` `manifest.webmanifest` `icon-180.png` `icon-192.png` `icon-512.png` をアップロード
-3. リポジトリの Settings → Pages → Branch を `main` / `/(root)` にして保存
-4. 少し待つと `https://<ユーザー名>.github.io/mod-bench/` で開ける
-
-### 2. トークンを作る
-
-GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
-
-- Repository access: **Only select repositories** でmodのリポジトリだけ選ぶ
-- Repository permissions:
-  - **Actions**: Read and write（ビルド開始・中止・やり直し）
-  - **Contents**: Read and write（ワークフロー追加・gradle.properties読み取り）
-  - **Workflows**: Read and write（ワークフロー追加。手動で置くなら不要）
-- 有効期限は好きに。切れたらアプリが「トークンが無効」と出すので作り直す
-
-### 3. アプリで接続
-
-1. アプリを開くと設定画面が出るので、`owner/リポジトリ名` とトークンを入れる
-2. 「ワークフローを追加」を押すと `.github/workflows/build.yml` がコミットされる
-   - 自分で置きたい時は同梱の `build.yml` をそのまま `.github/workflows/` に入れる
-3. 「クラフト開始」でビルド
-
-### 4. ホーム画面に追加
-
-- iPhone: Safariで開いて 共有 → ホーム画面に追加
-- Android: Chromeのメニュー → ホーム画面に追加
-
-## zipアップロードでビルド
-
-modのソースをGitHubに上げてなくても、フォルダをzipにして選ぶだけでビルドできる。
-
-1. 空の**非公開**リポジトリを作る（例: `mc-build-uploads`）。ソースはここに置かれるので必ず private にする
-2. トークンの Repository access にそのリポジトリも入れる
-3. アプリの設定「アップロード先」に `owner/mc-build-uploads` を入れる
-4. 「ワークフローを追加」（`upload-build.yml` が入る）
-5. 「zipアップロード」タブでzipを選んで「アップロードしてクラフト」
-
-- zipの中の `build/` `.gradle/` `run/` `.idea/` などはアプリが自動で外してから送る
-- zipがフォルダ1個を包んでいても、`build.gradle` がある階層を自動で探す
-- `gradlew` が無くても、`gradle-wrapper.properties` のバージョンか最新のGradleでビルドする
-- アップロードは新しいもの10個まで残して、古いものはビルド時に自動で消える
+- zipの中の `build/` `.gradle/` `run/` `.idea/` などを外してから送る
+- フォルダが入れ子でも、`build.gradle` がある階層を探す
+- `gradle.properties` の `minecraft_version` からJavaを選ぶ（1.20.1→17、1.20.5以降→21 など）
+- Forge / NeoForge / Fabric / Quilt を見分けて、表示名を `mod_name` と `mod_version` から付ける
+- 失敗したら、どのファイルの何行目でコンパイルエラーが出たかを表示
 
 ## 仕組みメモ
 
-- `build.yml` は `workflow_dispatch` で起動、`./gradlew <タスク>` を実行
-- jarは2か所に置かれる
-  - Actionsのartifact `mod-jars`（14日保存）
-  - `dev-build` という名前のプレリリース（毎回上書き）。スマホから直接落とせるのはこっち
-- コンパイルエラーは javac / Kotlin の出力から拾ってGitHubのアノテーションにしてる。GitHubの上限で1回に表示できるのは9件まで
-- 非公開リポジトリのjarを落とす時は、ブラウザでGitHubにログインしておく必要がある
+- アップロードしたzipは非公開リポジトリ `mc-build-uploads` の `upload/…` ブランチに置かれる
+- `upload-build.yml`（mc-build-uploads 側）がzipを展開してビルドし、jarをリリースに置く
+- `gradlew` が無いzipでも、`gradle-wrapper.properties` のバージョンか最新のGradleでビルドする
+- アップロードとjarは新しいもの10個まで残って、古いものはビルド時に自動で消える
+- 非公開リポジトリのjarがアプリから落とせない時は、GitHubにログインした状態でリリースページから落とす
 - トークンは「この端末に保存」をオンにするとブラウザ内に保存される。共有端末ではオフにする
-- Gradle wrapper（`gradlew`）がリポジトリにコミットされている前提

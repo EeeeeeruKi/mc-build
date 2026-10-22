@@ -56,9 +56,6 @@ header.top .bar { display: flex; align-items: center; gap: 12px; padding-block: 
 .brand { min-width: 0; flex: 1; }
 .brand h1 { font: 20px/1.1 var(--font-display); margin: 0; letter-spacing: .02em; }
 .brand .repo { font: 12px/1.3 var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding-bottom: 10px; }
-.tabs button { min-height: 36px; font: 14px/1 var(--font-display); letter-spacing: .04em; background: var(--sunk); color: var(--muted); }
-.tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 
 main.wrap { display: flex; flex-direction: column; gap: 20px; padding-block: 16px; }
 section h2 { font: 13px/1.4 var(--font-display); letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
@@ -77,8 +74,6 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .check input { width: 18px; height: 18px; }
 .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
 .hint code, .mono-s { font-family: var(--font-mono); font-size: 12px; }
-fieldset.group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-fieldset.group legend { font: 12px var(--font-display); letter-spacing: .06em; color: var(--muted); padding: 0; margin-bottom: 2px; }
 
 button, .btn {
   font: 700 15px/1 var(--font-body); border-radius: var(--r); border: 1px solid var(--line);
@@ -174,10 +169,6 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
       </div>
       <button class="btn-ghost btn-small" id="btnSettings" type="button">設定</button>
     </div>
-    <div class="tabs" id="tabs" role="group" aria-label="モード" hidden>
-      <button type="button" data-mode="repo" aria-pressed="true">リポジトリ</button>
-      <button type="button" data-mode="upload" aria-pressed="false">zipアップロード</button>
-    </div>
   </div>
 </header>
 
@@ -189,23 +180,11 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
       <label class="f">GitHubトークン（Fine-grained）
         <input class="mono" id="inToken" type="password" placeholder="github_pat_…" autocapitalize="off" spellcheck="false" required>
       </label>
-      <p class="hint">Repository access で下の2つのリポジトリを選び、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
-      <fieldset class="group">
-        <legend>リポジトリからビルド</legend>
-        <label class="f">modのリポジトリ（owner/名前）
-          <input class="mono" id="inRepo" placeholder="your-name/my-mod" autocapitalize="off" spellcheck="false">
-        </label>
-        <label class="f">ワークフローのファイル名
-          <input class="mono" id="inWf" value="build.yml" autocapitalize="off" spellcheck="false">
-        </label>
-      </fieldset>
-      <fieldset class="group">
-        <legend>zipアップロードでビルド</legend>
-        <label class="f">アップロード先（非公開リポジトリ）
-          <input class="mono" id="inUploadRepo" placeholder="your-name/mc-build-uploads" autocapitalize="off" spellcheck="false">
-        </label>
-      </fieldset>
-      <p class="hint">どちらか片方だけでも使えます。</p>
+      <p class="hint">Repository access でアップロード先のリポジトリを選び、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
+      <label class="f">アップロード先（非公開リポジトリ）
+        <input class="mono" id="inUploadRepo" placeholder="EeeeeeruKi/mc-build-uploads" autocapitalize="off" spellcheck="false">
+      </label>
+      <p class="hint">空のままなら EeeeeeruKi/mc-build-uploads を使います。</p>
       <label class="check"><input type="checkbox" id="inRemember" checked> この端末にトークンを保存する</label>
       <div class="actions">
         <button class="btn-primary" type="submit">保存して接続</button>
@@ -233,30 +212,6 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
         <textarea class="yaml" id="yamlView" readonly></textarea>
       </details>
     </div>
-  </section>
-
-  <!-- リポジトリからビルド -->
-  <section id="secBuild" hidden>
-    <h2>ビルド</h2>
-    <form class="panel" id="formBuild">
-      <div class="row">
-        <label class="f">ブランチ
-          <select class="mono" id="inBranch"></select>
-        </label>
-        <label class="f">Java
-          <select class="mono" id="inJava">
-            <option value="8">8</option><option value="11">11</option><option value="16">16</option>
-            <option value="17">17</option><option value="21" selected>21</option><option value="25">25</option>
-          </select>
-          <span class="autojava" id="javaHint"></span>
-        </label>
-      </div>
-      <label class="f">Gradleタスク
-        <input class="mono" id="inTask" value="build" autocapitalize="off" spellcheck="false">
-      </label>
-      <label class="check"><input type="checkbox" id="inRelease" checked> 成功したらjarをダウンロード用に置く</label>
-      <button class="btn-primary btn-big" type="submit" id="btnBuild">クラフト開始</button>
-    </form>
   </section>
 
   <!-- zipアップロード -->
@@ -307,153 +262,6 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
 
 <div class="toast" id="toast" role="status" hidden></div>
 
-<script type="text/plain" id="workflowYaml">
-name: Build Mod
-run-name: "Build (${{ inputs.gradle_task || 'build' }}) on ${{ github.ref_name }}"
-
-on:
-  workflow_dispatch:
-    inputs:
-      java_version:
-        description: "Java version (1.20.5+ → 21, 1.18〜1.20.4 → 17, 〜1.16 → 8)"
-        required: false
-        default: "21"
-      gradle_task:
-        description: "Gradle task"
-        required: false
-        default: "build"
-      release:
-        description: "成功したjarを dev-build リリースに置く（スマホから直接ダウンロード用）"
-        required: false
-        type: choice
-        options: ["yes", "no"]
-        default: "yes"
-
-permissions:
-  contents: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: ${{ inputs.java_version || '21' }}
-
-      - uses: gradle/actions/setup-gradle@v5
-
-      - name: Gradle build
-        id: build
-        shell: bash
-        env:
-          TASK: ${{ inputs.gradle_task || 'build' }}
-        run: |
-          chmod +x ./gradlew
-          set -o pipefail
-          ./gradlew $TASK --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
-
-      - name: Report build errors
-        if: failure() && steps.build.outcome == 'failure'
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import os, re
-          ws = (os.environ.get("SRC_ROOT") or os.environ["GITHUB_WORKSPACE"]).rstrip("/") + "/"
-          try:
-              lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
-          except FileNotFoundError:
-              lines = []
-          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
-          lines = [ansi.sub("", l) for l in lines]
-
-          def esc(s):  # message escaping
-              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-          def escp(s):  # property escaping
-              return esc(s).replace(":", "%3A").replace(",", "%2C")
-
-          java_re = re.compile(r"^(/\S+\.java):(\d+): error: (.*)$")
-          kt_re = re.compile(r"^e: (?:file://)?(/\S+\.kts?):(\d+):(\d+) (.*)$")
-          errors = []
-          for i, l in enumerate(lines):
-              m = java_re.match(l)
-              if m:
-                  path, line, msg = m.group(1), m.group(2), m.group(3)
-                  # javacは次の行にソース行を出すので添える
-                  if i + 1 < len(lines) and lines[i + 1].strip():
-                      msg += "\n" + lines[i + 1].rstrip()
-                  errors.append((path, line, None, msg))
-                  continue
-              m = kt_re.match(l)
-              if m:
-                  errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
-
-          # 同じエラーが2回出力されることがあるので重複を除く
-          seen, uniq = set(), []
-          for e in errors:
-              k = (e[0], e[1], e[3].split("\n")[0])
-              if k not in seen:
-                  seen.add(k); uniq.append(e)
-          errors = uniq
-          # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
-          for path, line, col, msg in errors[:9]:
-              rel = path[len(ws):] if path.startswith(ws) else path
-              props = f"file={escp(rel)},line={line}"
-              if col:
-                  props += f",col={col}"
-              print(f"::error {props},title=Compile error::{esc(msg)}")
-
-          summary = []
-          if "* What went wrong:" in lines:
-              start = lines.index("* What went wrong:") + 1
-              for l in lines[start:]:
-                  if l.startswith("* Try:") or l.startswith("* Exception is:"):
-                      break
-                  summary.append(l)
-          if not summary:
-              summary = lines[-40:]
-          text = "\n".join(summary).replace(ws, "").strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
-          if len(errors) > 9:
-              text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
-          print(f"::error title=Gradle::{esc(text)}")
-          PY
-
-      - name: Upload jars
-        if: success()
-        uses: actions/upload-artifact@v5
-        with:
-          name: mod-jars
-          path: |
-            **/build/libs/*.jar
-            !**/build/libs/*-sources.jar
-            !**/build/libs/*-javadoc.jar
-            !**/build/libs/*-dev*.jar
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Publish dev-build release
-        if: success() && inputs.release != 'no'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          shopt -s globstar nullglob
-          files=()
-          for f in **/build/libs/*.jar; do
-            case "$f" in *-sources.jar|*-javadoc.jar|*-dev*.jar) continue;; esac
-            files+=("$f")
-          done
-          [ ${#files[@]} -gt 0 ] || { echo "jarが見つかりません"; exit 1; }
-          gh release delete dev-build --cleanup-tag -y 2>/dev/null || true
-          gh release create dev-build "${files[@]}" \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Dev build (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" \
-            --notes "run:${GITHUB_RUN_ID}"
-</script>
 <script type="text/plain" id="uploadWorkflowYaml">
 name: Build Upload
 run-name: "${{ inputs.label || inputs.upload_ref }}"
@@ -664,14 +472,11 @@ jobs:
 const API = "https://api.github.com";
 const KEY = "modbench.v1";
 const UPLOAD_WF = "upload-build.yml";
+const DEFAULT_UPLOAD_REPO = "EeeeeeruKi/mc-build-uploads";
 const JSZIP_URL = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-const S = { repo: "", uploadRepo: "", token: "", wf: "build.yml", remember: true, mode: "repo",
-            branch: "", java: "", task: "build", release: true, upTask: "build" };
+const S = { uploadRepo: "", token: "", remember: true, upTask: "build" };
 const $ = (id) => document.getElementById(id);
-const YAML = {
-  repo: $("workflowYaml").textContent.replace(/^\n/, ""),
-  upload: $("uploadWorkflowYaml").textContent.replace(/^\n/, ""),
-};
+const UPLOAD_YAML = $("uploadWorkflowYaml").textContent.replace(/^\n/, "");
 
 const infos = {};            // repo -> repo info
 let runsCache = [];
@@ -725,12 +530,8 @@ function stamp() {
     Math.random().toString(16).slice(2, 6);
 }
 
-/* ---------- mode ---------- */
-function modes() { return [S.repo && "repo", S.uploadRepo && "upload"].filter(Boolean); }
-function ctx() {
-  return S.mode === "upload" ? { repo: S.uploadRepo, wf: UPLOAD_WF, yaml: YAML.upload }
-                             : { repo: S.repo, wf: S.wf || "build.yml", yaml: YAML.repo };
-}
+/* ---------- target ---------- */
+function ctx() { return { repo: S.uploadRepo || DEFAULT_UPLOAD_REPO, wf: UPLOAD_WF, yaml: UPLOAD_YAML }; }
 const R = () => "/repos/" + ctx().repo;
 const info = () => infos[ctx().repo];
 
@@ -793,34 +594,16 @@ function mcVersionFrom(props) {
   const m = /^\s*(?:minecraft_version|mc_version|minecraftVersion)\s*[=:]\s*([^\s#]+)/m.exec(props || "");
   return m ? m[1] : null;
 }
-async function detectJava() {
-  $("javaHint").textContent = "";
-  try {
-    const txt = await gh(R() + "/contents/gradle.properties?ref=" + encodeURIComponent(S.branch), { accept: "application/vnd.github.raw+json" });
-    const mc = mcVersionFrom(txt), j = mc && javaForMc(mc);
-    if (!j) return;
-    $("inJava").value = j; S.java = j;
-    $("javaHint").textContent = "MC " + mc + " → Java " + j + "（自動）";
-  } catch (e) { /* gradle.properties が無いだけなら無視 */ }
-}
 
 /* ---------- boot ---------- */
 function setSectionsHidden() {
-  ["secBuild", "secUpload", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
-}
-function renderTabs() {
-  const ms = modes();
-  $("tabs").hidden = ms.length < 2;
-  $("tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === S.mode)));
+  ["secUpload", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
 }
 async function connect() {
   gen++; clearTimeout(pollTimer);
   showError(""); setSectionsHidden();
-  const ms = modes();
-  if (!S.token || !ms.length) { $("hdrRepo").textContent = "未設定"; $("tabs").hidden = true; openSettings(); return; }
-  if (!ms.includes(S.mode)) S.mode = ms[0];
-  renderTabs();
   const c = ctx();
+  if (!S.token) { $("hdrRepo").textContent = "未設定"; openSettings(); return; }
   $("hdrRepo").textContent = c.repo;
   const g = gen;
   try {
@@ -828,27 +611,9 @@ async function connect() {
   } catch (e) { if (g === gen) { showError(explain(e, "リポジトリ")); openSettings(); } return; }
   if (g !== gen) return;
 
-  if (S.mode === "repo") {
-    $("secBuild").hidden = false;
-    try {
-      const br = await gh(R() + "/branches?per_page=100");
-      const names = br.map((b) => b.name);
-      if (!names.includes(info().default_branch)) names.unshift(info().default_branch);
-      if (!S.branch || !names.includes(S.branch)) S.branch = info().default_branch;
-      $("inBranch").innerHTML = names.map((n) => `<option ${n === S.branch ? "selected" : ""}>${esc(n)}</option>`).join("");
-    } catch (e) {
-      S.branch = S.branch || info().default_branch;
-      $("inBranch").innerHTML = `<option>${esc(S.branch)}</option>`;
-    }
-    $("inTask").value = S.task || "build";
-    $("inRelease").checked = S.release !== false;
-    if (S.java) $("inJava").value = S.java;
-    detectJava();
-  } else {
-    $("secUpload").hidden = false;
-    $("inUpTask").value = S.upTask || "build";
-    if (!info().private) showError("アップロード先が公開リポジトリです。アップロードしたソースは誰でも見られます。非公開にするか、別の非公開リポジトリを設定してください。");
-  }
+  $("secUpload").hidden = false;
+  $("inUpTask").value = S.upTask || "build";
+  if (!info().private) showError("アップロード先が公開リポジトリです。アップロードしたソースは誰でも見られます。非公開にするか、別の非公開リポジトリを設定してください。");
   $("secJar").hidden = false; $("secRuns").hidden = false;
 
   try {
@@ -866,11 +631,6 @@ function showInstall() {
   $("secInstall").hidden = false;
   $("btnInstall").hidden = false; $("btnInstallSure").hidden = true; $("btnInstallSure").disabled = false;
 }
-$("tabs").addEventListener("click", (ev) => {
-  const b = ev.target.closest("button[data-mode]");
-  if (!b || b.dataset.mode === S.mode) return;
-  S.mode = b.dataset.mode; saveState(); connect();
-});
 
 /* ---------- refresh ---------- */
 async function refreshAll() {
@@ -968,9 +728,7 @@ async function refreshRuns() {
   const open = new Set([...list.querySelectorAll("details.run[open]")].map((d) => d.dataset.id));
   list.innerHTML = runsCache.map((run) => {
     const st = statusOf(run);
-    const sub = S.mode === "upload"
-      ? `#${run.run_number} ・ zip ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}`
-      : `#${run.run_number} ・ ${esc(run.head_branch)} @ ${esc((run.head_sha || "").slice(0, 7))} ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}`;
+    const sub = `#${run.run_number} ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}`;
     return `<details class="run" data-id="${run.id}" ${open.has(String(run.id)) ? "open" : ""}>
       <summary>
         <span class="pill ${st.cls}">${st.label}</span>
@@ -1053,29 +811,6 @@ $("runList").addEventListener("click", async (ev) => {
   } catch (e) { toast(explain(e, b.dataset.act === "cancel" ? "中止" : "再実行")); b.disabled = false; }
 });
 
-/* ---------- build from repo ---------- */
-$("formBuild").addEventListener("submit", async (ev) => {
-  ev.preventDefault();
-  const btn = $("btnBuild");
-  S.branch = $("inBranch").value; S.java = $("inJava").value;
-  S.task = $("inTask").value.trim() || "build"; S.release = $("inRelease").checked;
-  saveState();
-  btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`;
-  showError("");
-  try {
-    await gh(R() + "/actions/workflows/" + encodeURIComponent(ctx().wf) + "/dispatches", {
-      method: "POST",
-      body: { ref: S.branch, inputs: { java_version: S.java, gradle_task: S.task, release: S.release ? "yes" : "no" } },
-    });
-    toast("ビルドを始めました");
-    setTimeout(refreshAll, 2500); setTimeout(refreshAll, 7000);
-  } catch (e) {
-    if (e.status === 422 && /input/i.test(e.message)) {
-      showError("リポジトリ側のワークフローが古いか別物です。最新の build.yml に置き換えてください。（" + e.message + "）");
-    } else showError(explain(e, "ビルドの開始"));
-  } finally { btn.disabled = false; btn.textContent = "クラフト開始"; }
-});
-$("inBranch").addEventListener("change", () => { S.branch = $("inBranch").value; saveState(); detectJava(); });
 
 /* ---------- zip upload ---------- */
 function loadJSZip() {
@@ -1262,20 +997,20 @@ $("btnCopyYaml").addEventListener("click", () => copyText(ctx().yaml));
 
 /* ---------- settings ---------- */
 function openSettings() {
-  $("inRepo").value = S.repo; $("inUploadRepo").value = S.uploadRepo;
-  $("inToken").value = S.token; $("inWf").value = S.wf || "build.yml";
+  $("inUploadRepo").value = S.uploadRepo;
+  $("inToken").value = S.token;
   $("inRemember").checked = S.remember !== false;
   $("secSettings").hidden = false;
-  $("btnCancelSettings").hidden = !(S.token && modes().length);
+  $("btnCancelSettings").hidden = !S.token;
 }
 $("btnSettings").addEventListener("click", () => { $("secSettings").hidden ? openSettings() : ($("secSettings").hidden = true); });
 $("btnCancelSettings").addEventListener("click", () => { $("secSettings").hidden = true; });
 $("btnForget").addEventListener("click", () => {
   try { localStorage.removeItem(KEY); } catch (e) {}
-  Object.assign(S, { repo: "", uploadRepo: "", token: "", wf: "build.yml", mode: "repo", branch: "", java: "", task: "build", release: true, upTask: "build" });
-  ["inRepo", "inUploadRepo", "inToken"].forEach((i) => ($(i).value = ""));
+  Object.assign(S, { uploadRepo: "", token: "", upTask: "build" });
+  ["inUploadRepo", "inToken"].forEach((i) => ($(i).value = ""));
   gen++; clearTimeout(pollTimer); setSectionsHidden();
-  $("tabs").hidden = true; $("hdrRepo").textContent = "未設定";
+  $("hdrRepo").textContent = "未設定";
   toast("保存を消しました");
 });
 function normRepo(v) {
@@ -1283,18 +1018,11 @@ function normRepo(v) {
 }
 $("formSettings").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  const repo = normRepo($("inRepo").value), up = normRepo($("inUploadRepo").value);
-  const ok = (r) => !r || /^[\w.-]+\/[\w.-]+$/.test(r);
-  if (!repo && !up) { showError("modのリポジトリか、アップロード先のどちらかを入れてください。"); return; }
-  if (!ok(repo) || !ok(up)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
-  if (repo !== S.repo) { S.branch = ""; S.java = ""; }
-  const prevModes = modes();
-  S.repo = repo; S.uploadRepo = up;
-  S.token = $("inToken").value.trim(); S.wf = $("inWf").value.trim() || "build.yml";
+  const up = normRepo($("inUploadRepo").value);
+  if (up && !/^[\w.-]+\/[\w.-]+$/.test(up)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
+  S.uploadRepo = up;
+  S.token = $("inToken").value.trim();
   S.remember = $("inRemember").checked;
-  // 新しく足したほうのモードを開く
-  if (up && !prevModes.includes("upload")) S.mode = "upload";
-  else if (repo && !prevModes.includes("repo")) S.mode = "repo";
   detailCache.clear();
   saveState();
   $("secSettings").hidden = true;
