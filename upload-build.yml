@@ -63,9 +63,42 @@ jobs:
             if [ -f gradle/wrapper/gradle-wrapper.properties ]; then
               v=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-\(bin\|all\)\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties | head -n1 || true)
             fi
-            echo "gradle_version=${v:-current}" >> "$GITHUB_OUTPUT"
+            if [ -z "$v" ]; then
+              # wrapperが無い時は、プラグインとMCバージョンから合うGradleを選ぶ
+              v=$(python3 - <<'PY'
+          import re
+          def read(p):
+              try:
+                  return open(p, encoding="utf-8", errors="replace").read()
+              except OSError:
+                  return ""
+          props = read("gradle.properties")
+          scripts = "".join(read(p) for p in ("build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"))
+          m = re.search(r"^\s*(?:minecraft_version|mc_version|minecraftVersion)\s*[=:]\s*([^\s#]+)", props, re.M)
+          mv = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", m.group(1)) if m else None
+          mc = tuple(int(x or 0) for x in mv.groups()) if mv else None
+          fg = re.search(r"net\.minecraftforge\.gradle['\"]?\s*\)?\s*version\s*\(?\s*['\"]\[?\s*(\d+)", scripts)
+          fg = int(fg.group(1)) if fg else None
+          if fg is not None and fg <= 5:
+              print("7.6.4")
+          elif fg == 6:
+              print("8.8")
+          elif mc is None:
+              print("8.14.3")
+          elif mc[0] >= 26:
+              print("current")
+          elif mc < (1, 19, 3):
+              print("7.6.4")
+          elif mc < (1, 21, 0):
+              print("8.8")
+          else:
+              print("8.14.3")
+          PY
+              )
+            fi
+            echo "gradle_version=${v:-8.14.3}" >> "$GITHUB_OUTPUT"
             echo "gradle_cmd=gradle" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Gradle::gradlew が無いので Gradle ${v:-（最新版）} を直接使います"
+            echo "::warning title=Gradle::gradlew が無いので Gradle ${v:-8.14.3} を使います。うまくいかない時は gradlew と gradle フォルダもzipに入れてください"
           fi
 
       - uses: actions/setup-java@v5
