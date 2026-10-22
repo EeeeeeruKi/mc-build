@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mod作業台</title>
+<meta name="theme-color" content="#151917">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow column like a crafting-table GUI — sticky header, build panel, latest jar, run history */
+:root {
+  --bg: #e9ecea; --surface: #ffffff; --sunk: #f3f5f4; --line: #d3d9d5;
+  --fg: #1c2320; --muted: #5b6761;
+  --accent: #2b7a68; --accent-fg: #ffffff; --accent-soft: #dcefe9;
+  --ok: #2c7f3d; --ok-bg: #e2f2e5; --bad: #b8352c; --bad-bg: #f8e3e1; --run: #9a6514; --run-bg: #f6ecd9;
+  --font-display: "DotGothic16", "Zen Kaku Gothic New", system-ui, sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 6px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141917; --surface: #1d2421; --sunk: #171d1a; --line: #2e3833;
+    --fg: #e2e8e4; --muted: #92a099;
+    --accent: #5cc2aa; --accent-fg: #0b1613; --accent-soft: #1d3a33;
+    --ok: #63c474; --ok-bg: #1b3221; --bad: #f2756b; --bad-bg: #3a1f1d; --run: #e3ad52; --run-bg: #3a2e19;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15px/1.6 var(--font-body);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  -webkit-text-size-adjust: 100%;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--surface); z-index: 10; }
+[hidden] { display: none !important; }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+.mark { display: grid; grid-template-columns: repeat(3, 6px); gap: 2px; flex: none; }
+.mark i { width: 6px; height: 6px; background: var(--line); }
+.mark i.on { background: var(--accent); }
+.brand { min-width: 0; flex: 1; }
+.brand h1 { font: 20px/1.1 var(--font-display); margin: 0; letter-spacing: .02em; }
+.brand .repo { font: 12px/1.3 var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+main.wrap { display: flex; flex-direction: column; gap: 20px; padding-block: 16px; }
+section h2 { font: 13px/1.4 var(--font-display); letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+input, select, textarea {
+  font: 15px/1.4 var(--font-body); color: var(--fg); background: var(--sunk);
+  border: 1px solid var(--line); border-radius: var(--r); padding: 10px 11px; width: 100%; min-width: 0;
+}
+input.mono, select.mono { font-family: var(--font-mono); font-size: 14px; }
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 380px) { .row { grid-template-columns: 1fr; } }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.check input { width: 18px; height: 18px; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.hint code, .mono-s { font-family: var(--font-mono); font-size: 12px; }
+
+button, .btn {
+  font: 700 15px/1 var(--font-body); border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); padding: 11px 14px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px;
+}
+button:disabled { opacity: .55; cursor: default; }
+.btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn-big { width: 100%; min-height: 54px; font: 20px/1 var(--font-display); letter-spacing: .06em; }
+.btn-ghost { border-color: transparent; background: transparent; padding-inline: 10px; }
+.btn-small { min-height: 34px; padding: 7px 11px; font-size: 13px; }
+.btn-danger { color: var(--bad); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.msg { border-radius: var(--r); padding: 10px 12px; font-size: 14px; }
+.msg.err { background: var(--bad-bg); color: var(--bad); }
+.msg.info { background: var(--accent-soft); color: var(--fg); }
+
+.autojava { font-size: 12px; color: var(--accent); }
+
+.jar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--sunk); text-decoration: none; color: inherit; }
+.jar .ico { width: 30px; height: 30px; flex: none; border-radius: 4px; background: var(--accent-soft); display: grid; place-items: center; font: 11px var(--font-display); color: var(--accent); }
+.jar .nm { font: 600 13.5px/1.35 var(--font-mono); word-break: break-all; min-width: 0; flex: 1; }
+.jar .sz { font: 12px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.meta { font-size: 12.5px; color: var(--muted); }
+
+.runs { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+details.run { border-top: 1px solid var(--line); }
+details.run:first-child { border-top: 0; }
+details.run > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; }
+details.run > summary::-webkit-details-marker { display: none; }
+details.run[open] > summary { background: var(--sunk); }
+.rtitle { font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rsub { grid-column: 2 / 4; font: 12px/1.4 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rtime { font: 12px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { font: 12px/1 var(--font-display); padding: 5px 8px; border-radius: 3px; white-space: nowrap; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.run { background: var(--run-bg); color: var(--run); }
+.pill.mut { background: var(--sunk); color: var(--muted); border: 1px solid var(--line); }
+.pill.run::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; vertical-align: 1px; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .pill.run::before { animation: none; } }
+
+.detail { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; background: var(--sunk); }
+.steps { list-style: none; margin: 0; padding: 0; font-size: 13.5px; display: flex; flex-direction: column; gap: 3px; }
+.steps li { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: baseline; }
+.steps .s { font-family: var(--font-mono); font-weight: 600; }
+.steps .s.ok { color: var(--ok); } .steps .s.bad { color: var(--bad); } .steps .s.run { color: var(--run); } .steps .s.mut { color: var(--muted); }
+.steps .d { font: 11.5px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.errs { display: flex; flex-direction: column; gap: 8px; }
+.err-item { border-left: 3px solid var(--bad); background: var(--surface); border-radius: 0 var(--r) var(--r) 0; padding: 8px 10px; min-width: 0; }
+.err-item .loc { font: 600 12px/1.4 var(--font-mono); color: var(--bad); word-break: break-all; }
+.err-item pre { margin: 4px 0 0; font: 12px/1.5 var(--font-mono); white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+.empty { padding: 18px 14px; color: var(--muted); font-size: 14px; text-align: center; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot .8s linear infinite; }
+@keyframes rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: var(--r); font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
+textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertical; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true"><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <div class="brand">
+      <h1>Mod作業台</h1>
+      <div class="repo" id="hdrRepo">未設定</div>
+    </div>
+    <button class="btn-ghost btn-small" id="btnSettings" type="button">設定</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 設定 -->
+  <section id="secSettings" hidden>
+    <h2>設定</h2>
+    <form class="panel" id="formSettings" autocomplete="off">
+      <label class="f">modのリポジトリ（owner/名前）
+        <input class="mono" id="inRepo" placeholder="your-name/my-mod" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <label class="f">GitHubトークン（Fine-grained）
+        <input class="mono" id="inToken" type="password" placeholder="github_pat_…" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <p class="hint">権限は対象リポジトリだけに絞って、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
+      <label class="f">ワークフローのファイル名
+        <input class="mono" id="inWf" value="build.yml" autocapitalize="off" spellcheck="false">
+      </label>
+      <label class="check"><input type="checkbox" id="inRemember" checked> この端末にトークンを保存する</label>
+      <div class="actions">
+        <button class="btn-primary" type="submit">保存して接続</button>
+        <button type="button" id="btnCancelSettings">閉じる</button>
+        <button type="button" class="btn-danger btn-ghost" id="btnForget">保存を消す</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="globalMsg" class="msg err" role="alert" hidden></div>
+
+  <!-- ワークフロー未設置 -->
+  <section id="secInstall" hidden>
+    <h2>はじめに</h2>
+    <div class="panel">
+      <p style="margin:0">このリポジトリにビルド用のワークフロー（<code class="mono-s" id="wfPath"></code>）がまだありません。</p>
+      <p class="hint">追加すると、デフォルトブランチにコミットが1つ作られます。トークンに Contents と Workflows の書き込み権限が必要です。</p>
+      <div class="actions">
+        <button class="btn-primary" type="button" id="btnInstall">ワークフローを追加</button>
+        <button type="button" id="btnInstallSure" class="btn-primary" hidden>コミットして追加する</button>
+        <button type="button" id="btnCopyYaml">YAMLをコピー</button>
+      </div>
+      <details>
+        <summary class="hint">中身を見る</summary>
+        <textarea class="yaml" id="yamlView" readonly></textarea>
+      </details>
+    </div>
+  </section>
+
+  <!-- ビルド -->
+  <section id="secBuild" hidden>
+    <h2>ビルド</h2>
+    <form class="panel" id="formBuild">
+      <div class="row">
+        <label class="f">ブランチ
+          <select class="mono" id="inBranch"></select>
+        </label>
+        <label class="f">Java
+          <select class="mono" id="inJava">
+            <option value="8">8</option><option value="11">11</option><option value="16">16</option>
+            <option value="17">17</option><option value="21" selected>21</option><option value="25">25</option>
+          </select>
+          <span class="autojava" id="javaHint"></span>
+        </label>
+      </div>
+      <label class="f">Gradleタスク
+        <input class="mono" id="inTask" value="build" autocapitalize="off" spellcheck="false">
+      </label>
+      <label class="check"><input type="checkbox" id="inRelease" checked> 成功したらjarをダウンロード用に置く</label>
+      <button class="btn-primary btn-big" type="submit" id="btnBuild">クラフト開始</button>
+    </form>
+  </section>
+
+  <!-- 最新jar -->
+  <section id="secJar" hidden>
+    <h2>最新のjar</h2>
+    <div class="panel" id="jarBox"></div>
+  </section>
+
+  <!-- 履歴 -->
+  <section id="secRuns" hidden>
+    <h2>ビルド履歴</h2>
+    <div class="runs" id="runList"><div class="empty"><span class="spin"></span></div></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="text/plain" id="workflowYaml">
+name: Build Mod
+run-name: "Build (${{ inputs.gradle_task || 'build' }}) on ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      java_version:
+        description: "Java version (1.20.5+ → 21, 1.18〜1.20.4 → 17, 〜1.16 → 8)"
+        required: false
+        default: "21"
+      gradle_task:
+        description: "Gradle task"
+        required: false
+        default: "build"
+      release:
+        description: "成功したjarを dev-build リリースに置く（スマホから直接ダウンロード用）"
+        required: false
+        type: choice
+        options: ["yes", "no"]
+        default: "yes"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version || '21' }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Gradle build
+        id: build
+        shell: bash
+        env:
+          TASK: ${{ inputs.gradle_task || 'build' }}
+        run: |
+          chmod +x ./gradlew
+          set -o pipefail
+          ./gradlew $TASK --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure() && steps.build.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re
+          ws = os.environ["GITHUB_WORKSPACE"].rstrip("/") + "/"
+          try:
+              lines = open("build.log", encoding="utf-8", errors="replace").read().splitlines()
+          except FileNotFoundError:
+              lines = []
+          ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+          lines = [ansi.sub("", l) for l in lines]
+
+          def esc(s):  # message escaping
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          def escp(s):  # property escaping
+              return esc(s).replace(":", "%3A").replace(",", "%2C")
+
+          java_re = re.compile(r"^(/\S+\.java):(\d+): error: (.*)$")
+          kt_re = re.compile(r"^e: (?:file://)?(/\S+\.kts?):(\d+):(\d+) (.*)$")
+          errors = []
+          for i, l in enumerate(lines):
+              m = java_re.match(l)
+              if m:
+                  path, line, msg = m.group(1), m.group(2), m.group(3)
+                  # javacは次の行にソース行を出すので添える
+                  if i + 1 < len(lines) and lines[i + 1].strip():
+                      msg += "\n" + lines[i + 1].rstrip()
+                  errors.append((path, line, None, msg))
+                  continue
+              m = kt_re.match(l)
+              if m:
+                  errors.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+
+          # GitHubの上限: 1ステップにつきerror注釈は10件まで → コンパイルエラー9件 + 概要1件
+          for path, line, col, msg in errors[:9]:
+              rel = path[len(ws):] if path.startswith(ws) else path
+              props = f"file={escp(rel)},line={line}"
+              if col:
+                  props += f",col={col}"
+              print(f"::error {props},title=Compile error::{esc(msg)}")
+
+          summary = []
+          if "* What went wrong:" in lines:
+              start = lines.index("* What went wrong:") + 1
+              for l in lines[start:]:
+                  if l.startswith("* Try:") or l.startswith("* Exception is:"):
+                      break
+                  summary.append(l)
+          if not summary:
+              summary = lines[-40:]
+          text = "\n".join(summary).strip()[:6000] or "ビルドに失敗しました（ログを確認してください）"
+          if len(errors) > 9:
+              text = f"コンパイルエラー {len(errors)} 件（先頭9件のみ表示）\n\n" + text
+          print(f"::error title=Gradle::{esc(text)}")
+          PY
+
+      - name: Upload jars
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-jars
+          path: |
+            **/build/libs/*.jar
+            !**/build/libs/*-sources.jar
+            !**/build/libs/*-javadoc.jar
+            !**/build/libs/*-dev*.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish dev-build release
+        if: success() && inputs.release != 'no'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s globstar nullglob
+          files=()
+          for f in **/build/libs/*.jar; do
+            case "$f" in *-sources.jar|*-javadoc.jar|*-dev*.jar) continue;; esac
+            files+=("$f")
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "jarが見つかりません"; exit 1; }
+          gh release delete dev-build --cleanup-tag -y 2>/dev/null || true
+          gh release create dev-build "${files[@]}" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Dev build (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" \
+            --notes "run:${GITHUB_RUN_ID}"
+</script>
+<script>
+"use strict";
+const API = "https://api.github.com";
+const KEY = "modbench.v1";
+const RELEASE_TAG = "dev-build";
+const S = { repo: "", token: "", wf: "build.yml", remember: true, branch: "", java: "", task: "build", release: true };
+const $ = (id) => document.getElementById(id);
+const WF_YAML = $("workflowYaml").textContent.replace(/^\n/, "");
+
+let repoInfo = null;
+let runsCache = [];
+const detailCache = new Map();
+let pollTimer = null;
+let latestRelease = null;
+
+/* ---------- storage ---------- */
+function loadState() {
+  try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+}
+function saveState() {
+  try {
+    const o = { ...S };
+    if (!S.remember) delete o.token;
+    localStorage.setItem(KEY, JSON.stringify(o));
+  } catch (e) {}
+}
+
+/* ---------- helpers ---------- */
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function toast(t) {
+  const el = $("toast"); el.textContent = t; el.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2600);
+}
+function showError(t) { const el = $("globalMsg"); el.textContent = t; el.hidden = !t; }
+function fmtSize(b) {
+  if (b == null) return "";
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(2) + " MB";
+}
+function ago(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "たった今";
+  if (s < 3600) return Math.floor(s / 60) + "分前";
+  if (s < 86400) return Math.floor(s / 3600) + "時間前";
+  return Math.floor(s / 86400) + "日前";
+}
+function dur(a, b) {
+  if (!a) return "";
+  const s = Math.max(0, Math.round(((b ? new Date(b) : new Date()) - new Date(a)) / 1000));
+  return s < 60 ? s + "s" : Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s";
+}
+function utf8b64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); toast("コピーしました"); }
+  catch (e) { const v = $("yamlView"); v.closest("details").open = true; v.focus(); v.select(); toast("選択したのでコピーしてください"); }
+}
+
+/* ---------- GitHub API ---------- */
+async function gh(path, { method = "GET", body, accept } = {}) {
+  let res;
+  try {
+    res = await fetch(path.startsWith("http") ? path : API + path, {
+      method,
+      cache: "no-store",
+      headers: {
+        "Accept": accept || "application/vnd.github+json",
+        "Authorization": "Bearer " + S.token,
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    const err = new Error("通信できませんでした。電波を確認してください。"); err.status = 0; throw err;
+  }
+  if (!res.ok) {
+    let msg = "";
+    try { msg = (await res.json()).message || ""; } catch (e) {}
+    const err = new Error(msg || res.statusText); err.status = res.status; throw err;
+  }
+  if (res.status === 204 || res.status === 202) return null;
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("json") ? res.json() : res.text();
+}
+function explain(e, what) {
+  const m = (e && e.message) || "";
+  switch (e && e.status) {
+    case 0: return m;
+    case 401: return "トークンが無効か期限切れです。設定から入れ直してください。";
+    case 403:
+      if (/rate limit/i.test(m)) return "GitHub APIの回数制限に達しました。少し待ってから試してください。";
+      return (what || "この操作") + "に必要な権限がトークンにありません（" + m + "）。";
+    case 404: return (what || "対象") + "が見つかりません。リポジトリ名と、トークンがこのリポジトリにアクセスできるかを確認してください。";
+    case 409: return "リポジトリが空か、競合が起きました（" + m + "）。";
+    case 422: return (what || "この操作") + "がGitHubに拒否されました: " + m;
+    default: return (what ? what + ": " : "") + (m || "不明なエラー");
+  }
+}
+const R = () => "/repos/" + S.repo;
+
+/* ---------- Java auto-detect from gradle.properties ---------- */
+function javaForMc(v) {
+  const m = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(v);
+  if (!m) return null;
+  const a = +m[1], b = +m[2], c = +(m[3] || 0);
+  if (a >= 26) return "25";
+  if (a !== 1) return null;
+  if (b <= 16) return "8";
+  if (b === 17) return "16";
+  if (b <= 19 || (b === 20 && c <= 4)) return "17";
+  return "21";
+}
+async function detectJava() {
+  $("javaHint").textContent = "";
+  try {
+    const txt = await gh(R() + "/contents/gradle.properties?ref=" + encodeURIComponent(S.branch), { accept: "application/vnd.github.raw+json" });
+    const m = /^\s*(?:minecraft_version|mc_version|minecraftVersion)\s*[=:]\s*([^\s#]+)/m.exec(txt);
+    if (!m) return;
+    const j = javaForMc(m[1]);
+    if (!j) return;
+    $("inJava").value = j; S.java = j;
+    $("javaHint").textContent = "MC " + m[1] + " → Java " + j + "（自動）";
+  } catch (e) { /* gradle.properties が無いだけなら無視 */ }
+}
+
+/* ---------- boot ---------- */
+async function connect() {
+  showError("");
+  $("hdrRepo").textContent = S.repo || "未設定";
+  if (!S.repo || !S.token) { openSettings(); return; }
+  try {
+    repoInfo = await gh(R());
+  } catch (e) { showError(explain(e, "リポジトリ")); openSettings(); return; }
+
+  $("secBuild").hidden = false; $("secJar").hidden = false; $("secRuns").hidden = false;
+
+  // branches
+  try {
+    const br = await gh(R() + "/branches?per_page=100");
+    const names = br.map((b) => b.name);
+    if (!names.includes(repoInfo.default_branch)) names.unshift(repoInfo.default_branch);
+    if (!S.branch || !names.includes(S.branch)) S.branch = repoInfo.default_branch;
+    $("inBranch").innerHTML = names.map((n) => `<option ${n === S.branch ? "selected" : ""}>${esc(n)}</option>`).join("");
+  } catch (e) {
+    S.branch = S.branch || repoInfo.default_branch;
+    $("inBranch").innerHTML = `<option>${esc(S.branch)}</option>`;
+  }
+  $("inTask").value = S.task || "build";
+  $("inRelease").checked = S.release !== false;
+  if (S.java) $("inJava").value = S.java;
+  detectJava();
+
+  // workflow present?
+  try {
+    await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf));
+    $("secInstall").hidden = true;
+  } catch (e) {
+    if (e.status === 404) { showInstall(); }
+    else showError(explain(e, "ワークフロー"));
+  }
+  refreshAll();
+}
+
+function showInstall() {
+  $("wfPath").textContent = ".github/workflows/" + S.wf;
+  $("secInstall").hidden = false;
+  $("btnInstall").hidden = false; $("btnInstallSure").hidden = true;
+}
+
+/* ---------- refresh ---------- */
+async function refreshAll() {
+  clearTimeout(pollTimer);
+  await Promise.all([refreshRuns(), refreshRelease()]);
+  const active = runsCache.some((r) => r.status !== "completed");
+  if (!document.hidden) pollTimer = setTimeout(refreshAll, active ? 5000 : 30000);
+}
+
+async function refreshRelease() {
+  const box = $("jarBox");
+  try {
+    latestRelease = await gh(R() + "/releases/tags/" + RELEASE_TAG);
+  } catch (e) {
+    latestRelease = null;
+    box.innerHTML = e.status === 404
+      ? `<p class="hint">まだありません。ビルドが成功するとここにjarが並びます。</p>`
+      : `<p class="hint">${esc(explain(e, "リリース"))}</p>`;
+    return;
+  }
+  const assets = latestRelease.assets || [];
+  box.innerHTML =
+    `<div class="meta">${esc(latestRelease.name || "")} ・ ${esc(ago(latestRelease.created_at))}</div>` +
+    (assets.length
+      ? assets.map((a) => `<a class="jar" href="${esc(a.browser_download_url)}" target="_blank" rel="noopener">
+          <span class="ico">JAR</span><span class="nm">${esc(a.name)}</span><span class="sz">${fmtSize(a.size)}</span></a>`).join("")
+      : `<p class="hint">jarがありません。</p>`) +
+    (repoInfo && repoInfo.private ? `<p class="hint">非公開リポジトリなので、ダウンロードにはブラウザでGitHubにログインしている必要があります。</p>` : "");
+}
+
+function statusOf(run) {
+  if (run.status !== "completed") return { cls: "run", label: run.status === "in_progress" ? "クラフト中" : "待機中" };
+  switch (run.conclusion) {
+    case "success": return { cls: "ok", label: "成功" };
+    case "failure": return { cls: "bad", label: "失敗" };
+    case "cancelled": return { cls: "mut", label: "中止" };
+    case "timed_out": return { cls: "bad", label: "時間切れ" };
+    default: return { cls: "mut", label: run.conclusion || "—" };
+  }
+}
+
+async function refreshRuns() {
+  const list = $("runList");
+  let data;
+  try {
+    data = await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf) + "/runs?per_page=15");
+  } catch (e) {
+    if (e.status === 404) { list.innerHTML = `<div class="empty">ワークフローを追加すると、ここに履歴が出ます。</div>`; runsCache = []; return; }
+    list.innerHTML = `<div class="empty">${esc(explain(e, "ビルド履歴"))}</div>`; return;
+  }
+  runsCache = data.workflow_runs || [];
+  if (!runsCache.length) { list.innerHTML = `<div class="empty">まだビルドしていません。</div>`; return; }
+
+  const open = new Set([...list.querySelectorAll("details.run[open]")].map((d) => d.dataset.id));
+  list.innerHTML = runsCache.map((run) => {
+    const st = statusOf(run);
+    const title = run.display_title || run.name;
+    return `<details class="run" data-id="${run.id}" ${open.has(String(run.id)) ? "open" : ""}>
+      <summary>
+        <span class="pill ${st.cls}">${st.label}</span>
+        <span class="rtitle">${esc(title)}</span>
+        <span class="rtime">${esc(ago(run.created_at))}</span>
+        <span class="rsub">#${run.run_number} ・ ${esc(run.head_branch)} @ ${esc((run.head_sha || "").slice(0, 7))} ・ ${dur(run.run_started_at, run.status === "completed" ? run.updated_at : null)}</span>
+      </summary>
+      <div class="detail" id="d-${run.id}"><div class="empty"><span class="spin"></span></div></div>
+    </details>`;
+  }).join("");
+
+  list.querySelectorAll("details.run").forEach((d) => {
+    d.addEventListener("toggle", () => { if (d.open) renderDetail(d.dataset.id); });
+    if (d.open) renderDetail(d.dataset.id);
+  });
+}
+
+/* ---------- run detail ---------- */
+async function renderDetail(id) {
+  const run = runsCache.find((r) => String(r.id) === String(id));
+  const box = $("d-" + id);
+  if (!run || !box) return;
+  const key = id + ":" + run.updated_at + ":" + run.status;
+  let d = detailCache.get(key);
+  if (!d) {
+    try {
+      const [jobs, arts] = await Promise.all([
+        gh(R() + "/actions/runs/" + id + "/jobs"),
+        gh(R() + "/actions/runs/" + id + "/artifacts"),
+      ]);
+      const anns = [];
+      for (const j of jobs.jobs || []) {
+        if (j.conclusion === "failure" && j.check_run_url) {
+          try { anns.push(...(await gh(j.check_run_url + "/annotations?per_page=50"))); } catch (e) {}
+        }
+      }
+      d = { jobs: jobs.jobs || [], arts: arts.artifacts || [], anns };
+      detailCache.set(key, d);
+    } catch (e) {
+      box.innerHTML = `<div class="msg err">${esc(explain(e, "ビルドの詳細"))}</div>`; return;
+    }
+  }
+
+  const stepIcon = (s) => s.status !== "completed" ? (s.status === "in_progress" ? ["run", "●"] : ["mut", "·"])
+    : s.conclusion === "success" ? ["ok", "✓"] : s.conclusion === "failure" ? ["bad", "✕"] : ["mut", "–"];
+  const steps = d.jobs.flatMap((j) => j.steps || []);
+
+  const errs = d.anns.filter((a) => a.annotation_level === "failure" && !/^Process completed with exit code/.test(a.message || ""));
+  const errHtml = errs.length ? `<div class="errs">${errs.map((a) => {
+      const loc = a.path && a.path !== ".github" ? `${a.path}:${a.start_line}` : (a.title || "エラー");
+      return `<div class="err-item"><div class="loc">${esc(loc)}</div><pre>${esc(a.message)}</pre></div>`;
+    }).join("")}</div>` : "";
+
+  const isReleased = latestRelease && (latestRelease.body || "").trim() === "run:" + id;
+  let artHtml = "";
+  if (run.conclusion === "success") {
+    if (isReleased) artHtml = `<p class="hint" style="margin:0">このビルドのjarは上の「最新のjar」から落とせます。</p>`;
+    else if (d.arts.length) artHtml = `<p class="hint" style="margin:0">jar（${d.arts.map((a) => esc(a.name) + " " + fmtSize(a.size_in_bytes) + (a.expired ? "・期限切れ" : "")).join(", ")}）はGitHubの実行ページ下部からダウンロードできます。</p>`;
+  }
+
+  const btns = [`<a class="btn btn-small" href="${esc(run.html_url)}" target="_blank" rel="noopener">GitHubで開く</a>`];
+  if (run.status !== "completed") btns.push(`<button class="btn-small btn-danger" data-act="cancel" data-id="${id}">中止</button>`);
+  if (run.status === "completed" && run.conclusion !== "success") btns.push(`<button class="btn-small" data-act="rerun" data-id="${id}">もう一回</button>`);
+
+  box.innerHTML = `
+    ${errHtml}
+    ${steps.length ? `<ul class="steps">${steps.map((s) => { const [c, i] = stepIcon(s);
+        return `<li><span class="s ${c}">${i}</span><span>${esc(s.name)}</span><span class="d">${s.started_at ? dur(s.started_at, s.completed_at) : ""}</span></li>`; }).join("")}</ul>`
+      : `<p class="hint" style="margin:0">ランナーの割り当て待ちです。</p>`}
+    ${artHtml}
+    <div class="actions">${btns.join("")}</div>`;
+}
+
+$("runList").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-act]");
+  if (!b) return;
+  b.disabled = true;
+  const id = b.dataset.id;
+  try {
+    if (b.dataset.act === "cancel") { await gh(R() + "/actions/runs/" + id + "/cancel", { method: "POST" }); toast("中止しました"); }
+    else { await gh(R() + "/actions/runs/" + id + "/rerun", { method: "POST" }); toast("もう一回ビルドします"); }
+    setTimeout(refreshAll, 1500);
+  } catch (e) { toast(explain(e, b.dataset.act === "cancel" ? "中止" : "再実行")); b.disabled = false; }
+});
+
+/* ---------- build ---------- */
+$("formBuild").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = $("btnBuild");
+  S.branch = $("inBranch").value; S.java = $("inJava").value;
+  S.task = $("inTask").value.trim() || "build"; S.release = $("inRelease").checked;
+  saveState();
+  btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`;
+  showError("");
+  try {
+    await gh(R() + "/actions/workflows/" + encodeURIComponent(S.wf) + "/dispatches", {
+      method: "POST",
+      body: { ref: S.branch, inputs: { java_version: S.java, gradle_task: S.task, release: S.release ? "yes" : "no" } },
+    });
+    toast("ビルドを始めました");
+    setTimeout(refreshAll, 2500);
+    setTimeout(refreshAll, 7000);
+  } catch (e) {
+    if (e.status === 422 && /Unexpected inputs|inputs/i.test(e.message)) {
+      showError("リポジトリ側のワークフローが古いか別物です。「設定」→ワークフロー名を確認するか、最新のbuild.ymlに置き換えてください。（" + e.message + "）");
+    } else showError(explain(e, "ビルドの開始"));
+  } finally {
+    btn.disabled = false; btn.textContent = "クラフト開始";
+  }
+});
+$("inBranch").addEventListener("change", () => { S.branch = $("inBranch").value; saveState(); detectJava(); });
+
+/* ---------- install workflow ---------- */
+$("btnInstall").addEventListener("click", () => { $("btnInstall").hidden = true; $("btnInstallSure").hidden = false; });
+$("btnInstallSure").addEventListener("click", async () => {
+  const b = $("btnInstallSure"); b.disabled = true;
+  const path = ".github/workflows/" + S.wf;
+  try {
+    let sha;
+    try { sha = (await gh(R() + "/contents/" + path + "?ref=" + encodeURIComponent(repoInfo.default_branch))).sha; } catch (e) { if (e.status !== 404) throw e; }
+    await gh(R() + "/contents/" + path, {
+      method: "PUT",
+      body: { message: "Add mod build workflow", content: utf8b64(WF_YAML), branch: repoInfo.default_branch, ...(sha ? { sha } : {}) },
+    });
+    toast("ワークフローを追加しました");
+    $("secInstall").hidden = true;
+    setTimeout(refreshAll, 1500);
+  } catch (e) {
+    showError(explain(e, "ワークフローの追加") + " うまくいかない時は「YAMLをコピー」して、GitHubで " + path + " を作って貼り付けてください。");
+    b.disabled = false;
+  }
+});
+$("btnCopyYaml").addEventListener("click", () => copyText(WF_YAML));
+$("yamlView").value = WF_YAML;
+
+/* ---------- settings ---------- */
+function openSettings() {
+  $("inRepo").value = S.repo; $("inToken").value = S.token; $("inWf").value = S.wf || "build.yml";
+  $("inRemember").checked = S.remember !== false;
+  $("secSettings").hidden = false;
+  $("btnCancelSettings").hidden = !(S.repo && S.token);
+}
+$("btnSettings").addEventListener("click", () => { $("secSettings").hidden ? openSettings() : ($("secSettings").hidden = true); });
+$("btnCancelSettings").addEventListener("click", () => { $("secSettings").hidden = true; });
+$("btnForget").addEventListener("click", () => {
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  Object.assign(S, { repo: "", token: "", wf: "build.yml", branch: "", java: "", task: "build", release: true });
+  $("inRepo").value = ""; $("inToken").value = "";
+  ["secBuild", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
+  $("hdrRepo").textContent = "未設定";
+  toast("保存を消しました");
+});
+$("formSettings").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  let repo = $("inRepo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/+$/, "");
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
+  const changed = repo !== S.repo;
+  S.repo = repo; S.token = $("inToken").value.trim(); S.wf = $("inWf").value.trim() || "build.yml";
+  S.remember = $("inRemember").checked;
+  if (changed) { S.branch = ""; S.java = ""; detailCache.clear(); }
+  saveState();
+  $("secSettings").hidden = true;
+  connect();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(pollTimer);
+  else if (S.repo && S.token && repoInfo) refreshAll();
+});
+
+loadState();
+connect();
+</script>
+</body>
+</html>
