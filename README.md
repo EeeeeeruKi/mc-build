@@ -6,13 +6,18 @@
 
 ## 使い方
 
-1. トークンを作る（https://github.com/settings/personal-access-tokens/new）
+誰でも使える。ビルドは使う人それぞれのGitHubアカウントの中で動く（GitHubアカウントが必要）。
+
+1. 非公開リポジトリ `mc-build-uploads` を作る（https://github.com/new?name=mc-build-uploads&visibility=private）
+2. トークンを作る（https://github.com/settings/personal-access-tokens/new）
    - Repository access: **Only select repositories** → `mc-build-uploads`
    - Permissions: **Actions / Contents / Workflows** を「Read and write」
-2. アプリの「設定」にトークンを貼って「保存して接続」
-   - アップロード先は空のままなら `EeeeeeruKi/mc-build-uploads` を使う
-3. modのフォルダ（build.gradle がある階層）をzipにして選ぶ
-4. 「アップロードしてクラフト」→ 数分で「最新のjar」からダウンロード
+3. アプリの「設定」にトークンを貼って「保存して接続」
+   - アップロード先は空のままなら「自分のGitHub名/mc-build-uploads」を使う
+4. 「ワークフローを追加」を押す（最初の1回だけ）
+5. modのフォルダ（build.gradle がある階層）をzipにして選び、「アップロードしてクラフト」
+
+アプリを開くと同じ手順が画面にも出る。
 
 ## アプリが自動でやること
 

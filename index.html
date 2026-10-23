@@ -107,6 +107,12 @@ button:disabled { opacity: .55; cursor: default; }
 .chip { font: 12px/1 var(--font-mono); padding: 6px 8px; border-radius: 3px; background: var(--sunk); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .chip b { font-weight: 600; color: var(--accent); }
 .notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+ol.guide { list-style: none; counter-reset: g; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+ol.guide li { counter-increment: g; display: grid; grid-template-columns: 26px 1fr; column-gap: 10px; row-gap: 6px; align-items: start; min-width: 0; }
+ol.guide li::before { content: counter(g); grid-row: span 3; width: 26px; height: 26px; display: grid; place-items: center; font: 14px var(--font-display); background: var(--accent-soft); color: var(--accent); border-radius: 3px; }
+ol.guide li > * { grid-column: 2; min-width: 0; }
+ol.guide li .btn { justify-self: start; }
+ol.guide code { font-family: var(--font-mono); font-size: 12px; }
 .notes li { padding-left: 16px; position: relative; }
 .notes li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; }
 .notes li.warn::before { background: var(--run); }
@@ -173,6 +179,30 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
 </header>
 
 <main class="wrap">
+  <!-- はじめての人向け -->
+  <section id="secGuide" hidden>
+    <h2>はじめに</h2>
+    <div class="panel">
+      <p style="margin:0">ビルドは自分のGitHubアカウントの中で動きます。最初に一度だけ準備してください（GitHubアカウントが必要です）。</p>
+      <ol class="guide">
+        <li>
+          <b>非公開リポジトリを作る</b>
+          <p class="hint">名前は <code>mc-build-uploads</code> のまま、Private のまま「Create repository」を押してください。アップロードしたソースはここに置かれます。</p>
+          <a class="btn btn-small" href="https://github.com/new?name=mc-build-uploads&amp;visibility=private&amp;description=Mod%E4%BD%9C%E6%A5%AD%E5%8F%B0%E3%81%AE%E3%82%A2%E3%83%83%E3%83%97%E3%83%AD%E3%83%BC%E3%83%89%E7%BD%AE%E3%81%8D%E5%A0%B4" target="_blank" rel="noopener">GitHubでリポジトリを作る</a>
+        </li>
+        <li>
+          <b>トークンを作る</b>
+          <p class="hint">Repository access は「Only select repositories」で <code>mc-build-uploads</code> を選びます。Permissions で Actions・Contents・Workflows を追加して、全部「Read and write」にしてください。最後に出る <code>github_pat_…</code> をコピーします。</p>
+          <a class="btn btn-small" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHubでトークンを作る</a>
+        </li>
+        <li>
+          <b>下の設定にトークンを貼って「保存して接続」</b>
+          <p class="hint">接続できたら「ワークフローを追加」を押せば準備完了です。</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
   <!-- 設定 -->
   <section id="secSettings" hidden>
     <h2>設定</h2>
@@ -180,11 +210,11 @@ textarea.yaml { font: 11.5px/1.5 var(--font-mono); height: 180px; resize: vertic
       <label class="f">GitHubトークン（Fine-grained）
         <input class="mono" id="inToken" type="password" placeholder="github_pat_…" autocapitalize="off" spellcheck="false" required>
       </label>
-      <p class="hint">Repository access でアップロード先のリポジトリを選び、Actions・Contents・Workflows を「Read and write」にしてください。トークンはGitHubにだけ送られます。</p>
+      <p class="hint">トークンはこの端末とGitHubの間だけでやりとりされ、ほかには送られません。</p>
       <label class="f">アップロード先（非公開リポジトリ）
-        <input class="mono" id="inUploadRepo" placeholder="EeeeeeruKi/mc-build-uploads" autocapitalize="off" spellcheck="false">
+        <input class="mono" id="inUploadRepo" placeholder="自分のGitHub名/mc-build-uploads" autocapitalize="off" spellcheck="false">
       </label>
-      <p class="hint">空のままなら EeeeeeruKi/mc-build-uploads を使います。</p>
+      <p class="hint">空のままなら「自分のGitHub名/mc-build-uploads」を使います。</p>
       <label class="check"><input type="checkbox" id="inRemember" checked> この端末にトークンを保存する</label>
       <div class="actions">
         <button class="btn-primary" type="submit">保存して接続</button>
@@ -505,7 +535,8 @@ jobs:
 const API = "https://api.github.com";
 const KEY = "modbench.v1";
 const UPLOAD_WF = "upload-build.yml";
-const DEFAULT_UPLOAD_REPO = "EeeeeeruKi/mc-build-uploads";
+const DEFAULT_REPO_NAME = "mc-build-uploads";
+let login = "";              // トークンの持ち主（GitHub名）
 const JSZIP_URL = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
 const S = { uploadRepo: "", token: "", remember: true, upTask: "build" };
 const $ = (id) => document.getElementById(id);
@@ -564,7 +595,7 @@ function stamp() {
 }
 
 /* ---------- target ---------- */
-function ctx() { return { repo: S.uploadRepo || DEFAULT_UPLOAD_REPO, wf: UPLOAD_WF, yaml: UPLOAD_YAML }; }
+function ctx() { return { repo: S.uploadRepo || (login ? login + "/" + DEFAULT_REPO_NAME : ""), wf: UPLOAD_WF, yaml: UPLOAD_YAML }; }
 const R = () => "/repos/" + ctx().repo;
 const info = () => infos[ctx().repo];
 
@@ -630,18 +661,30 @@ function mcVersionFrom(props) {
 
 /* ---------- boot ---------- */
 function setSectionsHidden() {
-  ["secUpload", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
+  ["secGuide", "secUpload", "secJar", "secRuns", "secInstall"].forEach((s) => ($(s).hidden = true));
 }
 async function connect() {
   gen++; clearTimeout(pollTimer);
   showError(""); setSectionsHidden();
-  const c = ctx();
-  if (!S.token) { $("hdrRepo").textContent = "未設定"; openSettings(); return; }
-  $("hdrRepo").textContent = c.repo;
+  if (!S.token) { $("hdrRepo").textContent = "未設定"; $("secGuide").hidden = false; openSettings(); return; }
   const g = gen;
+  if (!S.uploadRepo && !login) {
+    try { login = (await gh("/user")).login; }
+    catch (e) { if (g === gen) { showError(explain(e, "アカウント")); $("secGuide").hidden = false; openSettings(); } return; }
+    if (g !== gen) return;
+  }
+  const c = ctx();
+  $("hdrRepo").textContent = c.repo;
   try {
     infos[c.repo] = await gh(R());
-  } catch (e) { if (g === gen) { showError(explain(e, "リポジトリ")); openSettings(); } return; }
+  } catch (e) {
+    if (g !== gen) return;
+    if (e.status === 404) {
+      showError(c.repo + " が見つかりません。まだ作っていなければ下の手順1で作ってください。作ってある時は、トークンの Repository access でこのリポジトリを選んでいるか確認してください。");
+    } else showError(explain(e, "リポジトリ"));
+    $("secGuide").hidden = false; openSettings();
+    return;
+  }
   if (g !== gen) return;
 
   $("secUpload").hidden = false;
@@ -1042,7 +1085,9 @@ $("btnForget").addEventListener("click", () => {
   try { localStorage.removeItem(KEY); } catch (e) {}
   Object.assign(S, { uploadRepo: "", token: "", upTask: "build" });
   ["inUploadRepo", "inToken"].forEach((i) => ($(i).value = ""));
+  login = "";
   gen++; clearTimeout(pollTimer); setSectionsHidden();
+  $("secGuide").hidden = false;
   $("hdrRepo").textContent = "未設定";
   toast("保存を消しました");
 });
@@ -1053,8 +1098,10 @@ $("formSettings").addEventListener("submit", (ev) => {
   ev.preventDefault();
   const up = normRepo($("inUploadRepo").value);
   if (up && !/^[\w.-]+\/[\w.-]+$/.test(up)) { showError("リポジトリは「owner/名前」の形で入れてください。"); return; }
+  const token = $("inToken").value.trim();
+  if (token !== S.token) login = "";
   S.uploadRepo = up;
-  S.token = $("inToken").value.trim();
+  S.token = token;
   S.remember = $("inRemember").checked;
   detailCache.clear();
   saveState();
