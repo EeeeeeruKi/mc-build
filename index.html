@@ -611,6 +611,7 @@ let prepared = null;         // cleaned zip waiting to upload
 /* かまどの状態 */
 let local = null;            // アップロード中 {pct, text}
 let pending = null;          // ビルド開始を頼んだ直後 {since}
+let craftLabel = "";         // いまクラフトしているものの名前
 let trackRunId = null;       // 今見ているビルド
 const jobsByRun = new Map(); // runId -> {key, jobs}
 let ticker = null;
@@ -1179,7 +1180,9 @@ function renderFurnace() {
   // 入力スロット
   const inUse = prepared || st.tone === "run";
   $("inItem").innerHTML = inUse ? pixelSvg("zip") : pixelSvg("zip", "ghost");
-  $("inCap").textContent = prepared ? prepared.file.name : (st.tone === "run" && run ? (run.display_title || "zip") : "zip");
+  $("inCap").textContent = prepared ? prepared.file.name
+    : (local || (pending && !trackRunId)) ? (craftLabel || "zip")
+    : (st.tone === "run" && run ? (run.display_title || "zip") : "zip");
 
   // 出力スロット：最後に成功したビルドのjar
   const okRun = runsCache.find((r) => r.conclusion === "success" && jarAssets(releaseByRun.get(String(r.id))).length);
@@ -1338,6 +1341,7 @@ $("formUpload").addEventListener("submit", async (ev) => {
   S.upTask = task; saveState();
   btn.disabled = true; showError("");
   const ref = "upload/" + stamp();
+  craftLabel = label;
   try {
     setLocal(0, "zipを整理しています");
     const out = new JSZip();
